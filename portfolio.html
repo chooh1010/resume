@@ -91,7 +91,7 @@
 <!-- 1. 댓글 트리 캐싱 -->
 <!-- ============================================ -->
 
-<h3>1. 댓글 트리 조회 병목 해소 &mdash; Cache-Aside + 이벤트 기반 무효화</h3>
+<h3>1. 댓글 트리 조회 병목 해소 &mdash; Cache-Aside + 이벤트 기반 무효화 <a href="https://velog.io/@chooh1010/%EA%B2%8C%EC%8B%9C%EA%B8%80-%EC%A1%B0%ED%9A%8C-%EB%8C%93%EA%B8%80-%EC%B2%AB-%ED%8E%98%EC%9D%B4%EC%A7%80-%EC%BA%90%EC%8B%B1" style="color:#1a73e8; font-size:9pt; font-weight:400;">Blog</a></h3>
 
 <!-- Problem -->
 <div class="step step-problem">Problem</div>
@@ -157,7 +157,7 @@
 <!-- 2. 캐시 스탬피드 -->
 <!-- ============================================ -->
 
-<h3>2. 캐시 스탬피드 방지 &mdash; Caffeine 원자적 로딩</h3>
+<h3>2. 캐시 스탬피드 방지 &mdash; Caffeine 원자적 로딩 <a href="https://velog.io/@chooh1010/%EC%BA%90%EC%8B%9C-%EC%8A%A4%ED%83%AC%ED%94%BC%EB%93%9C-%EB%B0%A9%EC%A7%80" style="color:#1a73e8; font-size:9pt; font-weight:400;">Blog</a></h3>
 
 <!-- Problem -->
 <div class="step step-problem">Problem</div>
@@ -220,7 +220,7 @@ return cache.get(postId, () -&gt; readOnlyTx.execute(status -&gt; buildCommentPa
 <!-- 3. 좋아요 멱등 처리 -->
 <!-- ============================================ -->
 
-<h3>3. 좋아요 동시 요청 멱등 처리 &mdash; ON DUPLICATE KEY UPDATE</h3>
+<h3>3. 좋아요 동시 요청 멱등 처리 &mdash; ON DUPLICATE KEY UPDATE <a href="https://velog.io/@chooh1010/%EC%A2%8B%EC%95%84%EC%9A%94-%EC%A4%91%EB%B3%B5-insert-%EA%B2%BD%EC%9F%81-%ED%95%B4%EA%B2%B0-3395eni0" style="color:#1a73e8; font-size:9pt; font-weight:400;">Blog</a></h3>
 
 <!-- Problem -->
 <div class="step step-problem">Problem</div>
@@ -286,7 +286,7 @@ if (affected &gt; 0) {
 <!-- 4. 집계 쿼리 분리 -->
 <!-- ============================================ -->
 
-<h3>4. 대용량 좋아요 집계 병목 제거 &mdash; 쿼리 분리 + 비정규화</h3>
+<h3>4. 대용량 좋아요 집계 병목 제거 &mdash; 쿼리 분리 + 비정규화 <a href="https://velog.io/@chooh1010/likes-%ED%92%80%EC%8A%A4%EC%BA%94-%EC%A0%9C%EA%B1%B0%EC%99%80-%EC%A7%91%EA%B3%84-%EC%BF%BC%EB%A6%AC-%EB%B6%84%EB%A6%AC" style="color:#1a73e8; font-size:9pt; font-weight:400;">Blog</a></h3>
 
 <!-- Problem -->
 <div class="step step-problem">Problem</div>
