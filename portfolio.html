@@ -18,7 +18,7 @@
   h3 { font-size: 12pt; margin: 20px 0 6px 0; padding-left: 10px; border-left: 3px solid #1a73e8; }
   .meta { font-size: 9.5pt; color: #555; margin: 4px 0 6px 0; }
 
-  /* 씽크등대 4단계 라벨 */
+  /* PAAR 라벨 */
   .step {
     display: inline-block;
     font-weight: 700;
@@ -27,9 +27,9 @@
     border-radius: 3px;
     margin: 10px 0 4px 0;
   }
-  .step-visual { background: #e8f0fe; color: #1a73e8; }
   .step-problem { background: #fce8e6; color: #d93025; }
-  .step-solve { background: #e6f4ea; color: #1e8e3e; }
+  .step-analyze { background: #e8f0fe; color: #1a73e8; }
+  .step-action { background: #e6f4ea; color: #1e8e3e; }
   .step-result { background: #fef7e0; color: #e37400; }
 
   /* 성과 박스 */
@@ -83,7 +83,7 @@
 <!-- ============================================ -->
 
 <h2>Popping-community &mdash; 커뮤니티 서비스</h2>
-<div class="meta">개인 프로젝트 (2025.03 ~ 현재) &middot; EC2 실 배포 &middot; <a href="https://github.com/chooh1010" style="color:#1a73e8;">GitHub</a></div>
+<div class="meta">개인 프로젝트 (2025.03 ~ 현재) &middot; EC2 실 배포 &middot; <a href="https://github.com/Popping-community/Popping-Server" style="color:#1a73e8;">GitHub</a></div>
 <div class="meta"><b>테스트 환경:</b> EC2 t2.micro (MySQL + Spring Boot 공유) &middot; JMeter 100 VUser &middot; DAU 1만 명 가정</div>
 <div class="meta"><b>데이터 규모:</b> 게시글 100만 &middot; 댓글 1,000만 &middot; 좋아요 450만 건</div>
 
@@ -93,8 +93,36 @@
 
 <h3>1. 댓글 트리 조회 병목 해소 &mdash; Cache-Aside + 이벤트 기반 무효화</h3>
 
-<!-- 시각화 -->
-<div class="step step-visual">1. 시각화</div>
+<!-- Problem -->
+<div class="step step-problem">Problem</div>
+<ul>
+  <li>게시글 상세 조회마다 댓글 트리를 재귀 CTE로 매번 조회하는 구조</li>
+  <li>동일한 CTE가 반복 실행되어 병목 발생 &mdash; JMeter 100 VUser, 10분간 <b>6,642회</b> 실행 확인</li>
+</ul>
+
+<!-- Analyze -->
+<div class="step step-analyze">Analyze</div>
+<table class="compare">
+  <tr><th style="width:120px;">검토 방식</th><th>검토 결과</th><th style="width:55px;">판단</th></tr>
+  <tr>
+    <td>Write-Through</td>
+    <td>쓰기 직후 즉시 최신 데이터를 보장할 필요가 없는 도메인. 동시 쓰기 시 느린 재조립이 최신 캐시를 덮어쓰는 정합성 문제도 존재</td>
+    <td><span class="tag-reject">기각</span></td>
+  </tr>
+  <tr>
+    <td>부분 무효화</td>
+    <td>CommentResponse가 record(불변)라 노드 하나를 바꾸면 루트까지 경로 전체를 재생성해야 함. 전체 재조립과 비용 차이 없음</td>
+    <td><span class="tag-reject">기각</span></td>
+  </tr>
+  <tr>
+    <td><b>Cache-Aside</b></td>
+    <td>안정적인 공통 데이터(트리 구조)만 캐시, 좋아요 수&middot;개인 반응은 조회 시점에 별도 합성</td>
+    <td><span class="tag-accept">채택</span></td>
+  </tr>
+</table>
+
+<!-- Action -->
+<div class="step step-action">Action</div>
 <div class="diagram">Client &rarr; [Spring Boot]
                &darr;
          cache.get(postId)
@@ -106,41 +134,16 @@
      &darr; @TransactionalEventListener(AFTER_COMMIT)
      &darr;
   cache.evict(postId)</div>
-
-<!-- 문제 -->
-<div class="step step-problem">2. 문제</div>
 <ul>
-  <li>게시글 상세 조회 시 댓글 첫 페이지가 함께 내려가는 구조. 댓글은 대댓글을 포함한 트리라 재귀 CTE 쿼리가 사용됨</li>
-  <li>동일한 CTE가 매 조회마다 반복 실행되어 병목 발생 &mdash; JMeter 100 VUser, 10분간 <b>6,642회</b> 실행 확인</li>
-</ul>
-
-<!-- 해결과정 -->
-<div class="step step-solve">3. 해결과정 &mdash; 왜 Cache-Aside를 선택했는가?</div>
-<table class="compare">
-  <tr><th style="width:120px;">검토 방식</th><th>검토 결과</th><th style="width:55px;">판단</th></tr>
-  <tr>
-    <td>Write-Through</td>
-    <td>트리 구조 특성상 댓글 작성 시 캐시 갱신 비용이 크고, 캐시 로직이 DB보다 복잡해짐</td>
-    <td><span class="tag-reject">기각</span></td>
-  </tr>
-  <tr>
-    <td>부분 무효화</td>
-    <td>변경 댓글만 교체하려면 트리 재조립 로직이 캐시 레이어에 침투, 복잡도 높음</td>
-    <td><span class="tag-reject">기각</span></td>
-  </tr>
-  <tr>
-    <td><b>Cache-Aside</b></td>
-    <td>안정적인 공통 데이터(트리 구조)만 캐시, 좋아요 수&middot;개인 반응은 조회 시점에 별도 합성</td>
-    <td><span class="tag-accept">채택</span></td>
-  </tr>
-</table>
-<ul>
-  <li>댓글 작성/삭제 시 <code>@TransactionalEventListener(AFTER_COMMIT)</code>으로 커밋 이후에만 evict &rarr; stale 데이터 캐싱 가능성 제거</li>
+  <li>Cache-Aside 패턴으로 댓글 첫 페이지(page=0)를 postId 키로 캐싱</li>
+  <li>캐시에는 트리 구조만 저장, likeCount&middot;dislikeCount는 조회 시 Comment 테이블 IN절로 합성 &rarr; 좋아요 발생 시 캐시 evict 불필요</li>
+  <li>같은 게시글이라도 사용자마다 likedByMe/dislikedByMe가 달라 공통 캐시 단일 반환 불가 &rarr; likedByMe=false 고정 저장, 조회 시 현재 사용자의 reaction을 IN() 배치 쿼리 1회로 합성</li>
+  <li>트랜잭션 안에서 evict하면 커밋 전에 다른 스레드가 캐시 미스를 보고 아직 커밋되지 않은 이전 상태를 읽어 캐시에 올릴 수 있음 &rarr; <code>@TransactionalEventListener(AFTER_COMMIT)</code>으로 커밋 완료 후 evict</li>
   <li>Caffeine <code>maximumSize=500</code>, <code>expireAfterWrite=10m</code>, <code>recordStats</code>로 히트율 모니터링</li>
 </ul>
 
-<!-- 결과/성과 -->
-<div class="step step-result">4. 결과/성과</div>
+<!-- Result -->
+<div class="step step-result">Result</div>
 <div class="result-box">
   <table>
     <tr><td class="label">인기 게시글 댓글 조회</td><td class="before">152 ms</td><td class="arrow">&rarr;</td><td class="after">43 ms</td></tr>
@@ -148,7 +151,7 @@
     <tr><td class="label">캐시 히트율</td><td class="before">&mdash;</td><td class="arrow">&rarr;</td><td class="after">평균 ~80%</td></tr>
   </table>
 </div>
-<div class="note">JMeter 100 VUser, 10분, 게시글 100만 건·댓글 1,000만 건, EC2 실서버 기준</div>
+<div class="note">JMeter 100 VUser, 10분, 게시글 100만 건&middot;댓글 1,000만 건, EC2 실서버 기준</div>
 
 <!-- ============================================ -->
 <!-- 2. 캐시 스탬피드 -->
@@ -156,57 +159,60 @@
 
 <h3>2. 캐시 스탬피드 방지 &mdash; Caffeine 원자적 로딩</h3>
 
-<!-- 시각화 -->
-<div class="step step-visual">1. 시각화</div>
-<div class="code"><span class="cm">// Before: get과 put이 분리 → 캐시 스탬피드 발생</span>
-CommentPage page = cache.getIfPresent(postId);
-if (page == null) {
-    page = buildCommentPage(postId);   <span class="cm">// 여러 스레드가 동시 진입</span>
-    cache.put(postId, page);
-}
-
-<span class="cm">// After: 원자적 로딩 → 동일 postId에 대해 1회만 실행</span>
-CommentPage page = cache.get(postId, key -&gt; buildCommentPage(key));</div>
-
-<!-- 문제 -->
-<div class="step step-problem">2. 문제</div>
+<!-- Problem -->
+<div class="step step-problem">Problem</div>
 <ul>
-  <li>캐시가 evict된 직후 동일 postId에 동시 요청이 몰리면 재귀 CTE가 <b>10~17건 중복 실행</b></li>
-  <li>기존 구조는 <code>cache.get → miss → build → cache.put</code>으로, get과 put이 분리되어 여러 스레드가 동시에 DB 재생성 경로로 진입 (캐시 스탬피드)</li>
-  <li>JMeter(HTTP 환경 재현) + CountDownLatch 기반 단위 테스트(원자성 검증)로 재현</li>
+  <li>캐시가 evict된 직후 동일 postId에 동시 요청이 몰리면 재귀 CTE가 중복 실행 &mdash; JMeter 50건 동시 요청에서 <b>10~17건</b>, CountDownLatch 기반 단위 테스트에서 <b>50건 전부</b> 중복 실행 확인</li>
+  <li>기존 구조는 <code>cache.get &rarr; miss &rarr; build &rarr; cache.put</code>으로, get과 put이 분리되어 여러 스레드가 동시에 DB 재생성 경로로 진입</li>
 </ul>
+<div class="code"><span class="cm">// Before: get과 put이 분리 → 캐시 스탬피드 발생</span>
+CommentPageResponse cached = cache.get(postId, CommentPageResponse.class);
+if (cached != null) {
+    return cached;
+}
+CommentPageResponse fresh = buildCommentPage(postId, 0);  <span class="cm">// 여러 스레드가 동시 진입</span>
+cache.put(postId, fresh);</div>
 
-<!-- 해결과정 -->
-<div class="step step-solve">3. 해결과정 &mdash; 왜 Caffeine cache.get(key, Callable)을 선택했는가?</div>
+<!-- Analyze -->
+<div class="step step-analyze">Analyze</div>
 <table class="compare">
   <tr><th style="width:150px;">검토 방식</th><th>검토 결과</th><th style="width:55px;">판단</th></tr>
   <tr>
     <td>전역 락 (synchronized)</td>
-    <td>서로 다른 postId 요청까지 함께 대기시켜 처리량 저하가 큼</td>
+    <td>서로 다른 postId 요청까지 함께 대기시켜 불필요한 처리량 저하</td>
     <td><span class="tag-reject">기각</span></td>
   </tr>
   <tr>
-    <td>ConcurrentHashMap<br>per-key 락</td>
-    <td>락 객체 생성&middot;해제 관리 복잡도와 메모리 부담</td>
+    <td>ConcurrentHashMap<br>per-key 락 직접 구현</td>
+    <td>캐시와 별도로 락 생명주기를 관리하는 복잡성이 추가됨</td>
     <td><span class="tag-reject">기각</span></td>
   </tr>
   <tr>
     <td><b>Caffeine<br>cache.get(key, Callable)</b></td>
-    <td>동일 key에 대한 재생성을 1회로 제한, 다른 key는 병렬 처리 유지</td>
+    <td>내부적으로 per-key 원자적 로딩을 제공. 락 생명주기를 캐시 엔트리에 맞춰 자동 관리</td>
     <td><span class="tag-accept">채택</span></td>
   </tr>
 </table>
 
-<!-- 결과/성과 -->
-<div class="step step-result">4. 결과/성과</div>
+<!-- Action -->
+<div class="step step-action">Action</div>
+<div class="code"><span class="cm">// After: 원자적 로딩 → 동일 postId에 대해 1회만 실행</span>
+return cache.get(postId, () -&gt; readOnlyTx.execute(status -&gt; buildCommentPage(postId, 0)));</div>
+<ul>
+  <li><code>cache.get(key, Callable)</code>로 동일 key에 대한 CTE 실행을 1회로 제한, 다른 key는 병렬 처리 유지</li>
+  <li>Callable 내부에서 <code>TransactionTemplate</code>으로 트랜잭션을 감싸, 향후 <code>refreshAfterWrite</code> 전환 시 Caffeine 백그라운드 스레드(ForkJoinPool)에서 실행되더라도 트랜잭션 컨텍스트 보장</li>
+</ul>
+
+<!-- Result -->
+<div class="step step-result">Result</div>
 <div class="result-box">
   <table>
-    <tr><td class="label">evict 직후 50건 동시 요청</td><td class="before">CTE 10~17건 중복</td><td class="arrow">&rarr;</td><td class="after">CTE 1건만 실행</td></tr>
+    <tr><td class="label">evict 직후 JMeter 50 VUser 동시 요청 (ramp 0s)</td><td class="before">CTE 10~17건 중복</td><td class="arrow">&rarr;</td><td class="after">CTE 1건만 실행</td></tr>
   </table>
 </div>
 <ul>
   <li>나머지 49건은 캐시 히트로 처리, key 단위 동작이므로 다른 게시글은 병렬 처리 유지</li>
-  <li><b>한계:</b> 단일 JVM 환경에서만 유효 &mdash; 다중 인스턴스 환경에서는 분산 락(Redis 등) 기반 확장 필요</li>
+  <li>CountDownLatch 기반 단위 테스트(50 스레드 동시 실행)로 CTE 실행 1회 고정 검증 통과</li>
   <li><b>트레이드오프:</b> 캐시 미스 시 첫 요청 완료까지 후속 요청 대기 (테스트 기준 최대 315ms)</li>
 </ul>
 
@@ -216,8 +222,36 @@ CommentPage page = cache.get(postId, key -&gt; buildCommentPage(key));</div>
 
 <h3>3. 좋아요 동시 요청 멱등 처리 &mdash; ON DUPLICATE KEY UPDATE</h3>
 
-<!-- 시각화 -->
-<div class="step step-visual">1. 시각화</div>
+<!-- Problem -->
+<div class="step step-problem">Problem</div>
+<ul>
+  <li>토글 기반 좋아요 처리에서 check-then-act 경쟁 상태 발생</li>
+  <li>여러 스레드가 동시에 "좋아요가 없다"고 판단 &rarr; insert 경쟁 &rarr; 한 요청만 성공, 나머지는 <b>유니크 제약 예외</b> &mdash; CountDownLatch 기반 단위 테스트로 동일 사용자 20건 동시 요청 시 17건 예외, JMeter 20 VUser 동시 요청에서도 예외 발생 확인</li>
+</ul>
+
+<!-- Analyze -->
+<div class="step step-analyze">Analyze</div>
+<table class="compare">
+  <tr><th style="width:170px;">검토 방식</th><th>검토 결과</th><th style="width:55px;">판단</th></tr>
+  <tr>
+    <td>비관적 락</td>
+    <td>Like row가 없으면 잠글 대상이 없어 Post에 락을 걸어야 함. 인기 게시글이 hot row가 되어 전체 직렬화로 처리량 급감</td>
+    <td><span class="tag-reject">기각</span></td>
+  </tr>
+  <tr>
+    <td>saveAndFlush +<br>예외 처리</td>
+    <td>트랜잭션 내 SQL 실패 시 Spring이 rollback-only로 마킹 &rarr; catch 후 정상 반환해도 커밋 시점에 UnexpectedRollbackException 발생</td>
+    <td><span class="tag-reject">기각</span></td>
+  </tr>
+  <tr>
+    <td><b>ON DUPLICATE KEY<br>UPDATE id = id +<br>affected rows</b></td>
+    <td>사전 조회 없이 insert 먼저 시도, 중복 시 no-op. affected rows로 실제 insert 여부를 판단해 count 증감</td>
+    <td><span class="tag-accept">채택</span></td>
+  </tr>
+</table>
+
+<!-- Action -->
+<div class="step step-action">Action</div>
 <div class="code"><span class="cm">// INSERT 멱등 처리 (affected rows = 1이면 신규 삽입)</span>
 @Query(value = "INSERT INTO likes (user_id, target_type, target_id) "
              + "VALUES (:userId, :targetType, :targetId) "
@@ -230,116 +264,118 @@ int affected = likeRepository.insertIgnore(userId, targetType, targetId);
 if (affected &gt; 0) {
     likeRepository.incrementCount(targetType, targetId, +1);
 }</div>
-
-<!-- 문제 -->
-<div class="step step-problem">2. 문제</div>
 <ul>
-  <li>토글 기반 좋아요 처리에서 check-then-act 경쟁 상태 발생</li>
-  <li>여러 스레드가 동시에 "좋아요가 없다"고 판단 &rarr; insert 경쟁 &rarr; 한 요청만 성공, 나머지는 <b>유니크 제약 예외</b></li>
-  <li>JMeter(HTTP 환경 재현) + CountDownLatch 기반 단위 테스트(원자성 검증)로 재현</li>
+  <li>INSERT IGNORE 대신 ON DUPLICATE KEY UPDATE를 선택: INSERT IGNORE는 유니크 제약 외에 NOT NULL, FK 위반도 모두 경고로 묻어버리는 문제</li>
+  <li>JDBC URL에 <code>useAffectedRows=true</code> 추가: MySQL Connector/J 기본값은 중복 시에도 found rows=1을 반환해 모든 스레드가 count를 중복 증가시키는 문제 발견 &rarr; changed rows 기준으로 전환하여 해결</li>
+  <li>삭제도 DELETE 영향 row 수가 1인 경우에만 count 감소 &mdash; 동일한 멱등 구조 적용</li>
 </ul>
 
-<!-- 해결과정 -->
-<div class="step step-solve">3. 해결과정 &mdash; 왜 ON DUPLICATE KEY UPDATE를 선택했는가?</div>
-<table class="compare">
-  <tr><th style="width:170px;">검토 방식</th><th>검토 결과</th><th style="width:55px;">판단</th></tr>
-  <tr>
-    <td>비관적 락</td>
-    <td>작업 전체를 직렬화해 처리량 급감, 데드락 위험</td>
-    <td><span class="tag-reject">기각</span></td>
-  </tr>
-  <tr>
-    <td>saveAndFlush +<br>예외 처리</td>
-    <td>트랜잭션이 rollback-only 상태 &rarr; UnexpectedRollbackException 발생</td>
-    <td><span class="tag-reject">기각</span></td>
-  </tr>
-  <tr>
-    <td><b>ON DUPLICATE KEY<br>UPDATE id = id +<br>affected rows</b></td>
-    <td>실제 insert 성공 시에만 count 반영, 예외 없이 멱등 처리</td>
-    <td><span class="tag-accept">채택</span></td>
-  </tr>
-</table>
-
-<!-- 결과/성과 -->
-<div class="step step-result">4. 결과/성과</div>
+<!-- Result -->
+<div class="step step-result">Result</div>
 <div class="result-box">
   <table>
-    <tr><td class="label">동일 사용자 동시 20 VUser</td><td class="before">유니크 제약 예외 다수</td><td class="arrow">&rarr;</td><td class="after">예외 0건, 멱등 처리</td></tr>
+    <tr><td class="label">동일 사용자 JMeter 20 VUser 동시 요청 (ramp 1s)</td><td class="before">유니크 제약 예외 다수</td><td class="arrow">&rarr;</td><td class="after">예외 0건, 멱등 처리</td></tr>
   </table>
 </div>
 <ul>
   <li>중복 요청에도 row 생성과 count 증가가 각각 1회만 반영</li>
-  <li>삭제도 DELETE 영향 row 수가 1인 경우에만 count 감소 &mdash; 동일한 멱등 구조 적용</li>
+  <li>CountDownLatch 기반 단위 테스트(20 스레드 동시 실행)로 예외 0건, 멱등 처리 검증 통과</li>
 </ul>
 
 <!-- ============================================ -->
 <!-- 4. 집계 쿼리 분리 -->
 <!-- ============================================ -->
 
-<h3>4. 대용량 집계 병목 제거 &mdash; 쿼리 분리 + 비정규화</h3>
+<h3>4. 대용량 좋아요 집계 병목 제거 &mdash; 쿼리 분리 + 비정규화</h3>
 
-<!-- 시각화 -->
-<div class="step step-visual">1. 시각화</div>
+<!-- Problem -->
+<div class="step step-problem">Problem</div>
+<ul>
+  <li>likes 450만 건 적재 후 부하 테스트 &rarr; <b>에러율 15.53%</b>, 평균 응답시간 <b>10,460ms</b>까지 악화</li>
+  <li>Slow Query Log 확인 결과, 집계와 개인화를 한 쿼리에서 처리하는 구조 때문에 WHERE 조건이 <code>target_type, target_id</code>로 시작 &rarr; UK 선두 컬럼(<code>user_id</code>)과 불일치, Leftmost Prefix Rule에 의해 풀스캔 발생</li>
+</ul>
 <div class="diagram">Before (단일 쿼리)
   SELECT COUNT(*), EXISTS(...)   &larr; likes 450만 건 풀스캔
   FROM likes
   WHERE target_type = ? AND target_id = ?
-  <span style="color:#d93025;">&uarr; UK 선두 컬럼이 user_id라 인덱스 레인지 스캔 불가</span>
+  <span style="color:#d93025;">&uarr; UK 선두 컬럼이 user_id라 인덱스 레인지 스캔 불가</span></div>
 
-After (분리)
-  [1] 집계값   &larr; comment.like_count (비정규화 칼럼, 인덱스 불필요)
-  [2] 개인 반응 &larr; SELECT ... FROM likes WHERE user_id = ? AND target_id = ?
-                    <span style="color:#1e8e3e;">&uarr; UK 선두 칼럼 user_id 활용, 인덱스 레인지 스캔</span></div>
-
-<!-- 문제 -->
-<div class="step step-problem">2. 문제</div>
-<ul>
-  <li>likes 450만 건 적재 후 부하 테스트 &rarr; <b>에러율 15.53%</b>, 평균 응답시간 <b>10,460ms</b>까지 악화</li>
-  <li>Slow Query Log 확인 결과, 댓글 반응 집계 쿼리가 likes 테이블을 <b>전체 스캔</b></li>
-  <li>원인: <code>likeCount</code>(집계)와 <code>likedByMe</code>(개인화)를 한 쿼리에서 처리 &rarr; UK 선두 칼럼이 <code>user_id</code>라 Leftmost Prefix Rule에 의해 인덱스 레인지 스캔 불가</li>
-</ul>
-
-<!-- 해결과정 -->
-<div class="step step-solve">3. 해결과정 &mdash; 왜 쿼리 분리 + 비정규화를 선택했는가?</div>
+<!-- Analyze -->
+<div class="step step-analyze">Analyze</div>
 <table class="compare">
   <tr><th style="width:150px;">검토 방식</th><th>검토 결과</th><th style="width:55px;">판단</th></tr>
   <tr>
     <td>집계 전용<br>인덱스 추가</td>
-    <td>에러 해소, 응답시간 정상화 &mdash; 그러나 별도 인덱스 유지 비용, 데이터 커질수록 부담</td>
+    <td>에러 즉시 해소(163ms, 에러 0%). 그러나 집계·개인화를 한 쿼리에서 처리하는 구조적 문제를 인덱스로 덮은 것에 불과. 데이터 증가 시 별도 인덱스 유지 비용도 함께 증가</td>
     <td><span class="tag-limit">한계</span></td>
   </tr>
   <tr>
+    <td>UK 순서 변경<br>(target 선두)</td>
+    <td>집계 쿼리(target_type 선두)와 개인화 쿼리(user_id 선두)의 WHERE 선두가 달라 UK 하나로 양쪽 커버 불가. 어느 방향이든 별도 인덱스 필요</td>
+    <td><span class="tag-reject">기각</span></td>
+  </tr>
+  <tr>
     <td><b>쿼리 구조 분리 +<br>비정규화 칼럼</b></td>
-    <td>집계는 comment 테이블의 비정규화 칼럼, 개인 반응만 likes에서 조회 &mdash; 별도 인덱스 불필요</td>
+    <td>집계는 comment 테이블의 비정규화 칼럼에서 직접 조회, 개인화만 likes에서 user_id 선두 UK 활용 &mdash; 별도 인덱스 불필요</td>
     <td><span class="tag-accept">채택</span></td>
   </tr>
 </table>
+
+<!-- Action -->
+<div class="step step-action">Action</div>
+<div class="diagram">After (분리)
+  [1] 집계값   &larr; comment.like_count (비정규화 칼럼, 인덱스 불필요)
+  [2] 개인 반응 &larr; SELECT ... FROM likes WHERE user_id = ? AND target_id IN (...)
+                    <span style="color:#1e8e3e;">&uarr; UK 선두 칼럼 user_id 활용, 인덱스 레인지 스캔</span></div>
 <ul>
+  <li>likeCount는 <code>UPDATE ... SET count = count + :delta</code>로 좋아요 insert/delete 시 동기 증감</li>
   <li>비정규화로 인한 count 불일치 위험은 재집계 배치로 보완</li>
-  <li>데이터 규모 확장 시 증분 집계나 CDC 기반 구조로 확장 가능하도록 고려</li>
 </ul>
 
-<!-- 결과/성과 -->
-<div class="step step-result">4. 결과/성과</div>
+<!-- Result -->
+<div class="step step-result">Result</div>
 <div class="result-box">
   <table>
     <tr><td class="label">평균 응답시간</td><td class="before">10,460 ms</td><td class="arrow">&rarr;</td><td class="after">167 ms</td></tr>
     <tr><td class="label">에러율</td><td class="before">15.53%</td><td class="arrow">&rarr;</td><td class="after">0%</td></tr>
   </table>
 </div>
-<div class="note">JMeter 100 VUser, 10분, likes 450만 건, EC2 실서버 기준</div>
+<div class="note">JMeter 100 VUser, 10분, likes 450만 건, EC2 실서버 기준. 별도 집계 인덱스 없이 기존 UK만으로 달성</div>
+
+<!-- ============================================ -->
+<!-- 5. CI/CD -->
+<!-- ============================================ -->
+
+<h3>5. GitHub Actions&middot;Jib 기반 CI/CD 파이프라인 및 모니터링 구축</h3>
+<div class="diagram">main push
+   &darr;
+GitHub Actions
+   &boxur; Gradle build + SonarCloud 분석
+   &boxur; Jib 이미지 생성 &rarr; Docker Hub push
+   &boxdr; SSH &rarr; EC2 docker-compose up -d
+
+Prometheus &rarr; Grafana (모니터링)</div>
+<ul>
+  <li>main 브랜치 push 시 빌드, 이미지 생성, 배포가 자동으로 수행되도록 구성</li>
+  <li>Prometheus&middot;Grafana로 애플리케이션 메트릭 모니터링 구축</li>
+</ul>
 
 <!-- ============================================ -->
 <!-- FINNA -->
 <!-- ============================================ -->
 
 <h2>FINNA &mdash; 루틴 관리 서비스</h2>
-<div class="meta">팀 프로젝트 (4명) &middot; 2024.01 ~ 2024.04 &middot; EC2 실 배포 &middot; 본인 담당: 백엔드 전체</div>
+<div class="meta">팀 프로젝트 (4명) &middot; 2024.01 ~ 2024.04 &middot; EC2 실 배포 &middot; 본인 담당: 백엔드 전체 &middot; <a href="https://github.com/Finna-GDSC/DoFarming_SERVER" style="color:#1a73e8;">GitHub</a></div>
 
 <!-- FINNA 1 -->
 <h3>1. Spring REST Docs 기반 API 문서화 체계 구축</h3>
 
-<div class="step step-visual">1. 시각화</div>
+<div class="step step-problem">Problem</div>
+<ul>
+  <li>Swagger는 문서용 어노테이션이 프로덕션 코드에 섞이고, 코드 변경 시 문서와 실제 동작이 어긋날 수 있음</li>
+</ul>
+
+<div class="step step-action">Action</div>
 <div class="diagram">테스트 코드 작성
       &darr;
   ./gradlew test
@@ -349,49 +385,39 @@ After (분리)
   copyDocument (static/docs에 배치)
       &darr;
   테스트 통과 시에만 문서 갱신 &rarr; 문서 = 항상 최신 상태</div>
-
-<div class="step step-problem">2. 문제</div>
 <ul>
-  <li>Swagger는 문서용 어노테이션이 프로덕션 코드에 섞이고, 코드 변경 시 문서와 실제 동작이 어긋날 수 있음</li>
-</ul>
-
-<div class="step step-solve">3. 해결과정</div>
-<ul>
-  <li>Spring REST Docs 도입, <code>test &rarr; asciidoctor &rarr; copyDocument</code> 흐름의 문서 생성 파이프라인 구성</li>
-  <li>테스트 통과 시에만 문서가 생성되도록 만들어 <b>문서 = 항상 최신 상태</b> 보장</li>
-  <li><code>RestDocsTest</code>, <code>RestDocsConfig</code>, <code>ApiDocumentUtils</code>를 분리해 공통 문서 설정 재사용</li>
+  <li>Spring REST Docs 도입, <code>test &rarr; asciidoctor &rarr; copyDocument</code> 파이프라인 구성</li>
+  <li>테스트 통과 시에만 문서가 생성되도록 만들어 <b>문서 = 항상 최신 상태</b> 보장, 프로덕션 코드 오염 제거</li>
   <li><code>@WithAuthUser</code> + Mock SecurityContext를 적용해 Firebase 인증 환경에서도 테스트와 문서화를 일관되게 수행</li>
 </ul>
 
-<div class="step step-result">4. 결과/성과</div>
+<div class="step step-result">Result</div>
 <ul>
   <li>테스트와 문서가 강하게 연결된 문서화 체계 구축</li>
-  <li>프로덕션 코드 오염 없이 API 문서 품질 유지</li>
+  <li>프로덕션 코드 오염 없이 API 문서 신뢰도 확보</li>
 </ul>
 
 <!-- FINNA 2 -->
 <h3>2. GitHub Actions + Jib 기반 CI/CD 자동화</h3>
 
-<div class="step step-visual">1. 시각화</div>
+<div class="step step-problem">Problem</div>
+<ul>
+  <li>로컬 빌드, Docker 이미지 생성, Docker Hub push, EC2 재배포까지 수동으로 처리</li>
+</ul>
+
+<div class="step step-action">Action</div>
 <div class="diagram">main push
    &darr;
 GitHub Actions
    &boxur; REST Docs 빌드
    &boxur; Jib 이미지 생성 &rarr; Docker Hub push
    &boxdr; SSH &rarr; EC2 docker-compose up -d</div>
-
-<div class="step step-problem">2. 문제</div>
-<ul>
-  <li>로컬 빌드, Docker 이미지 생성, Docker Hub push, EC2 재배포까지 수동으로 처리</li>
-</ul>
-
-<div class="step step-solve">3. 해결과정</div>
 <ul>
   <li>Jib를 사용해 <b>Dockerfile 없이</b> 이미지 빌드 &mdash; 레이어 캐싱으로 빌드 효율 향상</li>
   <li>Docker Hub Access Token, SSH 키 등 민감 정보는 GitHub Secrets로 분리 관리</li>
 </ul>
 
-<div class="step step-result">4. 결과/성과</div>
+<div class="step step-result">Result</div>
 <ul>
   <li>문서 생성, 이미지 빌드, 배포가 하나의 파이프라인으로 연결</li>
   <li>수동 배포 절차를 제거해 팀이 기능 개발과 검증에 집중할 수 있도록 지원</li>
