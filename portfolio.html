@@ -361,6 +361,170 @@ Prometheus &rarr; Grafana (모니터링)</div>
 </ul>
 
 <!-- ============================================ -->
+<!-- PoppingOps -->
+<!-- ============================================ -->
+
+<h2>PoppingOps &mdash; 백엔드 운영 모니터링&middot;장애 알림 자동화</h2>
+<div class="meta">개인 프로젝트 (2026.04) &middot; Bash &middot; Railway &middot; Docker &middot; GitHub Actions &middot; <a href="https://github.com/Popping-community/popping-ops-railway" style="color:#1a73e8;">GitHub</a></div>
+
+<h3>1. EC2 서버 장애 감지 자동화 &mdash; SSH 메트릭 수집 + 상태 전이 알림</h3>
+
+<!-- Problem -->
+<div class="step step-problem">Problem</div>
+<ul>
+  <li>t2.micro에서 Spring Boot + MySQL만으로도 리소스가 빠듯해 Prometheus + Grafana를 EC2에 함께 띄우기 어려워 로컬 PC에서 모니터링</li>
+  <li>PC를 끄면 모니터링과 알림이 함께 중단되는 구조</li>
+</ul>
+
+<!-- Analyze -->
+<div class="step step-analyze">Analyze</div>
+<ul>
+  <li>단일 시점 gauge 값만으로는 평균 응답시간&middot;에러율 같은 rate 지표를 산출할 수 없음 &mdash; 이전 snapshot과의 counter delta 계산이 필요</li>
+</ul>
+
+<!-- Action -->
+<div class="step step-action">Action</div>
+<div class="diagram">Railway Container
+  └─ health-check.sh ── SSH ── EC2 actuator/node-exporter/mysqld-exporter
+         ├─ 10분 snapshot 저장
+         ├─ counter delta 기반 트래픽 지표/응답시간/에러율 계산
+         ├─ 임계값 기반 상태 전이 감지 (Memory ≥80% WARN, ≥95% CRITICAL 등)
+         └─ Discord Webhook 알림 + runbook 기반 권장 조치
+</div>
+<ul>
+  <li>SSH로 actuator, node-exporter, mysqld-exporter 메트릭을 10분마다 수집해 snapshot으로 저장</li>
+  <li>이전 snapshot 대비 counter delta로 트래픽 지표, 평균 응답시간, 에러율을 계산 &mdash; 첫 수집처럼 이전 sample이 없는 경우 rate 수치를 계산 대기로 처리해 오탐 방지</li>
+  <li>WARN&middot;CRITICAL&middot;복구 상태 전이 발생 시 Discord Webhook으로 즉시 알림</li>
+</ul>
+
+<!-- Result -->
+<div class="step step-result">Result</div>
+<div class="result-box">
+  <table>
+    <tr><td class="label">장애 인지 소요시간</td><td class="before">수동 확인 (PC 종료 시 불가)</td><td class="arrow">&rarr;</td><td class="after">최대 10분 이내 자동 알림</td></tr>
+  </table>
+</div>
+
+<!-- ============================================ -->
+<!-- PoppingOps 2. 계층 분리 -->
+<!-- ============================================ -->
+
+<h3>2. 정기 감지&middot;권장 조치&middot;보고 계층 분리로 LLM 비용과 장애 영향 범위 축소</h3>
+
+<!-- Problem -->
+<div class="step step-problem">Problem</div>
+<ul>
+  <li>모든 감지와 판단을 LLM으로 처리하면 10분마다 토큰이 소비되고, LLM provider 장애 시 모니터링 핵심 경로가 함께 흔들림</li>
+  <li>알림 발생 시 권장 조치도 매번 LLM을 호출하면 비용과 응답 지연이 누적</li>
+</ul>
+
+<!-- Analyze -->
+<div class="step step-analyze">Analyze</div>
+<table class="compare">
+  <tr><th style="width:150px;">검토 방식</th><th>검토 결과</th><th style="width:55px;">판단</th></tr>
+  <tr>
+    <td>모든 감지를<br>LLM으로 처리</td>
+    <td>정상 상태에서도 매 10분마다 토큰 소비. provider 장애 = 모니터링 장애. 임계값 비교 같은 단순 판단에 LLM은 과잉</td>
+    <td><span class="tag-reject">기각</span></td>
+  </tr>
+  <tr>
+    <td>권장 조치를<br>매번 LLM 호출</td>
+    <td>같은 종류&middot;심각도의 알림마다 같은 권장 조치를 반복 생성. 알림 지연 발생</td>
+    <td><span class="tag-reject">기각</span></td>
+  </tr>
+  <tr>
+    <td><b>임계값 기반 상태 판단 +<br>Runbook 우선 +<br>LLM은 해석에만</b></td>
+    <td>정기 메트릭 수집과 임계값 비교는 bash가 처리하고, 권장 조치는 JSON runbook을 우선 적용하며, LLM은 사용자 질문&middot;리포트 작성&middot;runbook 미매칭 fallback처럼 해석이 필요한 경우에만 사용</td>
+    <td><span class="tag-accept">채택</span></td>
+  </tr>
+</table>
+
+<!-- Action -->
+<div class="step step-action">Action</div>
+<div class="diagram">Detection Layer (Bash, LLM 없음)
+  └─ health-check.sh: 임계값 비교 → 상태 전이 감지
+         ↓
+State Layer (snapshot)
+  └─ /tmp/health-check-alerts/status-current.env
+         ↓
+Recommendation Layer (JSON runbook, LLM 없음)
+  └─ JSON runbook: 알림 종류&middot;심각도별 권장 조치 우선 적용
+  └─ 미매칭 시에만 LLM fallback
+         ↓
+Analysis Layer (LLM, 필요 시에만)
+  └─ Daily Summary(9AM) / Full Report(6시간) / 사용자 질문
+         ↓
+Notification Layer
+  └─ Discord Webhook</div>
+<ul>
+  <li>정기 감지와 기본 장애 알림은 Bash 임계값 기반으로 처리해 정상 반복 체크의 토큰 비용 0원, LLM 장애 시에도 감지와 알림은 계속 동작</li>
+  <li>JSON runbook에 정의한 알림 종류&middot;심각도별 권장 조치를 우선 적용하고, 예외적인 알림만 LLM fallback으로 처리</li>
+  <li>LLM은 사용자 질문, Daily Summary&middot;Full Report 작성, runbook에 직접 절차가 없는 알림의 fallback처럼 해석이 필요한 구간에만 사용해 수집&middot;판단 경로와 분석 경로를 분리</li>
+  <li>Full Report는 helper가 <code>full_report_should_report=true</code>로 판단한 경우에만 LLM 호출, 변화 없으면 생략</li>
+</ul>
+
+<!-- Result -->
+<div class="step step-result">Result</div>
+<div class="result-box">
+  <table>
+    <tr><td class="label">정상 상태 토큰 비용</td><td class="before">매 10분마다 소비</td><td class="arrow">&rarr;</td><td class="after">0원 (bash 처리)</td></tr>
+    <tr><td class="label">권장 조치 경로</td><td class="before">매번 LLM 호출</td><td class="arrow">&rarr;</td><td class="after">runbook 우선, 미매칭만 LLM fallback</td></tr>
+    <tr><td class="label">LLM provider 장애 시</td><td class="before">핵심 감지 경로 영향</td><td class="arrow">&rarr;</td><td class="after">감지&middot;1차 알림은 계속 동작</td></tr>
+  </table>
+</div>
+
+<!-- ============================================ -->
+<!-- PoppingOps 3. 자기 진단 -->
+<!-- ============================================ -->
+
+<h3>3. 모니터링 파이프라인 자기 진단 &mdash; &ldquo;서버 장애&rdquo;와 &ldquo;감지 불능&rdquo;을 구분</h3>
+
+<!-- Problem -->
+<div class="step step-problem">Problem</div>
+<ul>
+  <li>모니터링 시스템 자체에 장애가 발생하면(SSH 끊김, exporter 응답 없음 등) 알림이 오지 않아 &ldquo;정상&rdquo;으로 오인할 수 있음</li>
+  <li>오래된 snapshot을 최신 상태로 보고하거나, exporter 누락으로 불완전한 데이터를 그대로 전달할 위험</li>
+</ul>
+
+<!-- Analyze -->
+<div class="step step-analyze">Analyze</div>
+<ul>
+  <li>SSH 실패, 메트릭 파싱 실패, 필수 메트릭 누락, 스냅샷 쓰기 실패 등 파이프라인 단계별로 장애 유형이 다르므로 유형별 추적이 필요</li>
+  <li>일시적 네트워크 지연과 실제 장애를 구분하려면 단일 실패로 즉시 알림하면 안 됨 &mdash; 연속 실패 카운트 기반 판단 필요</li>
+  <li>snapshot 측정 시각 기반 freshness 판정이 없으면 stale data를 현재 상태로 오인하게 됨</li>
+</ul>
+
+<!-- Action -->
+<div class="step step-action">Action</div>
+<div class="diagram">health-check.sh / heartbeat-context.sh
+  ├─ SSH 연결 확인         → 실패 시 연결 실패 카운트 증가
+  ├─ 메트릭 수집/검증      → 파싱 실패 또는 필수 값 누락 시 resource_parse 카운트 증가
+  └─ snapshot 저장         → 저장 실패 시 snapshot_write 카운트 증가
+
+  [유형별 2회 연속 실패] → "모니터링 장애 알림"
+
+snapshot freshness 판정
+  ├─ &lt;20분: OK
+  ├─ 20~30분: WARN (오래됨)
+  └─ &gt;30분: CRITICAL (수집 중단 가능성)
+
+필수 메트릭/핵심 값 검증
+  ├─ app/node/mysql metrics 누락
+  ├─ 핵심 값 비어 있음/0 이하
+  └─ 위 경우 모두 resource_parse로 처리하고 snapshot 갱신 중단</div>
+<ul>
+  <li>파이프라인 각 단계의 실패를 유형별로 추적, 동일 유형 2회 연속 실패 시 &ldquo;모니터링 장애&rdquo; 알림 발송 &mdash; 일시적 네트워크 지연과 실제 장애 구분</li>
+  <li>snapshot freshness 검증으로 오래된 데이터를 현재 상태로 오인하는 문제 방지</li>
+  <li>필수 메트릭 누락 검증으로 불완전한 snapshot이 리포트에 포함되지 않도록 차단</li>
+</ul>
+
+<!-- Result -->
+<div class="step step-result">Result</div>
+<ul>
+  <li>&ldquo;서버가 죽은 것&rdquo;과 &ldquo;모니터링이 죽은 것&rdquo;을 구분해 알림 &mdash; 감지 불능 상태를 정상으로 오인하는 문제 방지</li>
+  <li>오래되거나 불완전한 데이터가 리포트에 포함되지 않도록 검증 계층 확보</li>
+</ul>
+<!-- ============================================ -->
 <!-- FINNA -->
 <!-- ============================================ -->
 
@@ -425,3 +589,4 @@ GitHub Actions
 
 </body>
 </html>
+
