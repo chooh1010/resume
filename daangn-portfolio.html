@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>조용현 - Daangn Portfolio</title>
+<style>
+  body {
+    font-family: 'Pretendard', 'Noto Sans KR', Arial, sans-serif;
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 36px 48px;
+    color: #222;
+    font-size: 10.5pt;
+    line-height: 1.65;
+  }
+  h1 { font-size: 20pt; margin: 0 0 4px 0; border-bottom: 2px solid #333; padding-bottom: 6px; }
+  h2 { font-size: 14pt; margin: 28px 0 4px 0; border-bottom: 2px solid #1a73e8; padding-bottom: 4px; }
+  h3 { font-size: 12pt; margin: 20px 0 6px 0; padding-left: 10px; border-left: 3px solid #1a73e8; }
+  .meta { font-size: 9.5pt; color: #555; margin: 4px 0 6px 0; }
+  .step { display: inline-block; font-weight: 700; font-size: 9.5pt; padding: 2px 8px; border-radius: 3px; margin: 10px 0 4px 0; }
+  .step-problem { background: #fce8e6; color: #d93025; }
+  .step-analyze { background: #e8f0fe; color: #1a73e8; }
+  .step-action { background: #e6f4ea; color: #1e8e3e; }
+  .step-result { background: #fef7e0; color: #e37400; }
+  .result-box { border: 1.5px solid #1a73e8; border-radius: 6px; padding: 10px 16px; margin: 6px 0 12px 0; background: #f8f9fa; }
+  .result-box table { width: 100%; border-collapse: collapse; }
+  .result-box td { padding: 3px 8px; font-size: 10pt; }
+  .result-box .label { color: #666; width: 180px; }
+  .result-box .before { color: #d93025; font-weight: 600; text-align: center; width: 120px; }
+  .result-box .arrow { text-align: center; width: 30px; color: #999; }
+  .result-box .after { color: #1a73e8; font-weight: 700; text-align: center; width: 120px; }
+  .diagram {
+    background: #fafafa; border: 1px solid #e0e0e0; border-radius: 4px;
+    padding: 10px 14px; font-family: 'Consolas', monospace; font-size: 9pt;
+    line-height: 1.55; margin: 6px 0 10px 0; white-space: pre;
+  }
+  table.compare { width: 100%; border-collapse: collapse; margin: 6px 0 10px 0; font-size: 9.5pt; }
+  table.compare th { background: #f0f0f0; padding: 5px 8px; text-align: left; border: 1px solid #ddd; }
+  table.compare td { padding: 5px 8px; border: 1px solid #ddd; vertical-align: top; }
+  .tag-reject { background: #fce8e6; color: #d93025; padding: 1px 5px; border-radius: 3px; font-size: 8.5pt; font-weight: 700; }
+  .tag-accept { background: #e6f4ea; color: #1e8e3e; padding: 1px 5px; border-radius: 3px; font-size: 8.5pt; font-weight: 700; }
+  ul { margin: 3px 0 8px 0; padding-left: 18px; }
+  li { margin-bottom: 3px; font-size: 9.5pt; }
+  .blue { font-weight: 700; color: #1a73e8; }
+</style>
+</head>
+<body>
+
+<h1>당근용 Portfolio</h1>
+
+<h2>PoppingOps &mdash; 운영 자동화 플랫폼 관점의 모니터링/알림 설계</h2>
+<div class="meta">개인 프로젝트 (2026.04) &middot; Bash &middot; Railway &middot; Docker &middot; GitHub Actions &middot; <a href="https://github.com/Popping-community/popping-ops-railway" style="color:#1a73e8;">GitHub</a></div>
+
+<h3>1. 로컬 PC 의존 감시를 운영 자동화 가능한 상시 모니터링 구조로 전환</h3>
+<div class="step step-problem">Problem</div>
+<ul>
+  <li>t2.micro 환경에서 Prometheus/Grafana를 상시 운영하기 어려워 로컬 PC 기반 모니터링에 의존</li>
+  <li>PC가 꺼지면 모니터링과 알림이 함께 중단돼 운영 자동화가 불가능한 구조</li>
+</ul>
+
+<div class="step step-analyze">Analyze</div>
+<ul>
+  <li>핵심은 "어디서나 돌아가는 가벼운 감시 경로"와 "사람이 읽을 수 있는 보고 경로"를 분리하는 것이라고 판단</li>
+  <li>정기 수집, 상태 판단, 알림, 요약 보고를 하나의 경로로 묶으면 비용과 실패 범위가 커짐</li>
+</ul>
+
+<div class="step step-action">Action</div>
+<div class="diagram">Railway Container
+  └─ health-check.sh
+       ├─ 10분마다 SSH로 actuator / node-exporter / mysqld-exporter 수집
+       ├─ snapshot 저장
+       ├─ counter delta로 응답시간 / 에러율 / 트래픽 계산
+       └─ WARN / CRITICAL / 복구 알림 전송</div>
+<ul>
+  <li>Railway 컨테이너가 10분마다 메트릭을 수집하고 snapshot 간 delta로 rate 지표를 계산</li>
+  <li>수동 확인 없이 <span class="blue">최대 10분 이내</span> 이상 징후를 인지할 수 있는 운영 구조로 전환</li>
+</ul>
+
+<div class="step step-result">Result</div>
+<div class="result-box">
+  <table>
+    <tr><td class="label">모니터링 의존성</td><td class="before">로컬 PC</td><td class="arrow">&rarr;</td><td class="after">Railway 상시 실행</td></tr>
+    <tr><td class="label">장애 인지</td><td class="before">수동 확인</td><td class="arrow">&rarr;</td><td class="after">최대 10분 이내 자동 알림</td></tr>
+  </table>
+</div>
+
+<h3>2. 정기 감지, 권장 조치, 보고 경로를 분리해 운영 비용과 실패 범위를 축소</h3>
+<div class="step step-analyze">Analyze</div>
+<table class="compare">
+  <tr><th style="width:180px;">검토 방식</th><th>검토 결과</th><th style="width:55px;">판단</th></tr>
+  <tr>
+    <td>정기 감지까지 LLM 사용</td>
+    <td>정상 상태에서도 반복 비용이 발생하고, LLM 장애가 감지 경로 장애로 이어짐</td>
+    <td><span class="tag-reject">기각</span></td>
+  </tr>
+  <tr>
+    <td>모든 권장 조치에 LLM 사용</td>
+    <td>반복적인 같은 알림에도 같은 조치를 계속 생성해 비용과 지연이 누적</td>
+    <td><span class="tag-reject">기각</span></td>
+  </tr>
+  <tr>
+    <td><b>규칙 기반 감지 +<br>runbook 우선 +<br>필요 시만 LLM</b></td>
+    <td>정기 메트릭 수집과 임계값 비교는 bash가 처리하고, LLM은 사용자 질문 / 요약 보고 / 예외 fallback에만 사용</td>
+    <td><span class="tag-accept">채택</span></td>
+  </tr>
+</table>
+
+<div class="step step-action">Action</div>
+<div class="diagram">Detection Layer
+  └─ bash 임계값 비교로 상태 전이 판단
+
+Recommendation Layer
+  ├─ JSON runbook 우선 적용
+  └─ 미매칭 시에만 LLM fallback
+
+Analysis Layer
+  ├─ 사용자 질문 응답
+  ├─ Daily Summary / Full Report
+  └─ 운영자용 해석 메시지</div>
+<ul>
+  <li>정기 감지와 기본 장애 알림은 bash가 처리하고, 권장 조치는 JSON runbook을 우선 적용</li>
+  <li>LLM은 사용자 질문, Daily Summary / Full Report, runbook 미매칭 alert fallback처럼 해석이 필요한 경우에만 사용</li>
+  <li>운영 자동화 경로와 해석 경로를 분리해 비용과 실패 범위를 축소</li>
+</ul>
+
+<div class="step step-result">Result</div>
+<div class="result-box">
+  <table>
+    <tr><td class="label">정상 상태 토큰 비용</td><td class="before">반복 소모 가능</td><td class="arrow">&rarr;</td><td class="after">0원</td></tr>
+    <tr><td class="label">권장 조치 생성</td><td class="before">매번 LLM 호출</td><td class="arrow">&rarr;</td><td class="after">runbook 우선, 미매칭만 fallback</td></tr>
+  </table>
+</div>
+
+<h3>3. 모니터링 자체 실패를 별도 추적해 감지 불능 상태를 정상으로 오인하지 않도록 설계</h3>
+<div class="step step-problem">Problem</div>
+<ul>
+  <li>SSH 실패, exporter 응답 누락, stale snapshot이 발생해도 이를 별도로 드러내지 않으면 "정상"으로 오인할 수 있음</li>
+</ul>
+
+<div class="step step-action">Action</div>
+<div class="diagram">health-check.sh / heartbeat-context.sh
+  ├─ SSH 연결 확인         → 실패 시 연결 실패 카운트 증가
+  ├─ 메트릭 수집/검증      → 파싱 실패 또는 필수 값 누락 시 resource_parse 카운트 증가
+  └─ snapshot 저장         → 저장 실패 시 snapshot_write 카운트 증가
+
+  [유형별 2회 연속 실패] → "모니터링 장애 알림"
+
+snapshot freshness 판정
+  ├─ <20분: OK
+  ├─ 20~30분: WARN
+  └─ >30분: CRITICAL
+
+필수 메트릭/핵심 값 검증
+  ├─ app/node/mysql metrics 누락
+  ├─ 핵심 값 비어 있음/0 이하
+  └─ 위 경우 모두 resource_parse로 처리하고 snapshot 갱신 중단</div>
+<ul>
+  <li>운영 대상 서버 장애와 운영 파이프라인 장애를 분리해 알림</li>
+  <li>stale snapshot과 불완전한 수집 결과가 정상처럼 읽히지 않도록 방어</li>
+</ul>
+
+<h2>Popping-community &mdash; DB/캐시/동시성 문제 해결</h2>
+<div class="meta">개인 프로젝트 (2025.03 ~ 현재) &middot; EC2 실 배포 &middot; 게시글 100만 &middot; 댓글 1,000만 &middot; 좋아요 450만 건</div>
+
+<ul>
+  <li>재귀 CTE 병목을 Cache-Aside로 개선해 인기 댓글 조회를 <span class="blue">152ms에서 43ms</span>로 단축</li>
+  <li>450만 likes 환경에서 인덱스 조건과 쿼리 역할을 분리해 응답시간을 <span class="blue">10,460ms에서 167ms</span>로, 에러율을 <span class="blue">15.53%에서 0%</span>로 안정화</li>
+  <li>동시 좋아요 요청 경쟁을 멱등 처리로 바꿔 동시 20 요청에서 <span class="blue">예외 0건</span> 달성</li>
+</ul>
+
+</body>
+</html>

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>조용현 - Daangn Resume</title>
+<style>
+  body {
+    font-family: 'Pretendard', 'Noto Sans KR', Arial, sans-serif;
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 36px 48px;
+    color: #222;
+    font-size: 10.5pt;
+    line-height: 1.55;
+  }
+  h1 { font-size: 22pt; margin: 0 0 2px 0; border-bottom: 2px solid #333; padding-bottom: 6px; }
+  h1 span { font-size: 12pt; font-weight: 400; color: #555; margin-left: 8px; }
+  .contacts { font-size: 9.5pt; color: #555; margin: 4px 0 14px 0; }
+  .contacts a { color: #555; text-decoration: none; }
+  h2 { font-size: 11.5pt; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 3px; margin: 14px 0 6px 0; }
+  .tags span { display: inline-block; background: #f0f0f0; border-radius: 3px; padding: 1px 7px; margin: 2px 3px 2px 0; font-size: 9pt; }
+  .pj-title { font-weight: 700; font-size: 10.5pt; margin: 8px 0 1px 0; }
+  .pj-meta { font-size: 8.5pt; color: #666; margin: 0 0 4px 0; }
+  .topic { font-weight: 700; font-size: 9.5pt; margin: 6px 0 1px 0; }
+  ul { margin: 1px 0 3px 0; padding-left: 16px; }
+  li { margin-bottom: 1px; font-size: 9pt; }
+  .blue { font-weight: 700; color: #1a73e8; }
+  .edu { margin: 4px 0; }
+  .edu-sub { font-size: 9pt; color: #555; }
+</style>
+</head>
+<body>
+
+<h1>조용현 <span>Backend Engineer Candidate</span></h1>
+<div class="contacts">
+  <a href="mailto:chooh1010@gmail.com">chooh1010@gmail.com</a> &middot;
+  <a href="https://github.com/chooh1010">github.com/chooh1010</a> &middot;
+  <a href="https://velog.io/@chooh1010/posts">velog.io/@chooh1010</a> &middot;
+  <a href="https://chooh1010.github.io/resume/daangn-portfolio.html">Portfolio</a>
+</div>
+
+<h2>보유 역량 요약</h2>
+<p style="font-size:9.5pt; margin:0 0 4px 0;">운영 자동화와 백엔드 문제 해결을 함께 다루며, DB/캐시/운영 경계를 설계해 본 백엔드 엔지니어</p>
+<ul>
+  <li>실제 서비스와 운영 자동화 프로젝트를 직접 배포/운영하며 메트릭 수집, 상태 판단, 알림, 보고 경로를 설계한 경험</li>
+  <li>DB 인덱스, 캐시, 데이터 구조, 동시성 문제를 재현하고 수치로 검증해 성능과 안정성을 개선한 경험</li>
+  <li>규칙 기반 판단과 LLM 기반 해석 경로를 분리해 운영 비용과 실패 범위를 줄인 경험</li>
+  <li>Java/Spring, MySQL, Redis-like cache 개념, Bash, Docker, GitHub Actions를 활용해 서비스 개발과 운영 자동화를 모두 경험</li>
+</ul>
+
+<h2>기술 스택</h2>
+<div class="tags">
+  <span>Java 21</span>
+  <span>Spring Boot 3.4</span>
+  <span>Spring Data JPA</span>
+  <span>Spring Security</span>
+  <span>MySQL 8.0</span>
+  <span>Caffeine Cache</span>
+  <span>AWS EC2</span>
+  <span>Docker</span>
+  <span>GitHub Actions</span>
+  <span>Bash</span>
+  <span>Railway</span>
+  <span>JMeter</span>
+</div>
+
+<h2>Projects</h2>
+
+<div class="pj-title">PoppingOps &mdash; 운영 모니터링/장애 알림 자동화 (2026.04) <a href="https://github.com/Popping-community/popping-ops-railway" style="color:#1a73e8; font-size:9pt;">GitHub</a></div>
+<div class="pj-meta">개인 프로젝트 &middot; Bash &middot; Railway &middot; Docker &middot; GitHub Actions</div>
+
+<div class="topic">로컬 PC 의존 감시를 Railway 기반 운영 자동화로 전환</div>
+<ul>
+  <li>t2.micro 환경에서 Prometheus/Grafana를 상시 띄우기 어려워 로컬 PC 의존 감시를 운영 중이었고, PC 종료 시 모니터링과 알림이 함께 중단되는 문제가 있었음</li>
+  <li>Railway 컨테이너가 10분마다 SSH로 actuator, node-exporter, mysqld-exporter 메트릭을 수집하고 snapshot 간 counter delta로 응답시간, 에러율, 트래픽 추세를 계산하도록 구현</li>
+  <li>수동 확인 없이 <span class="blue">최대 10분 이내</span> 서버 이상을 인지할 수 있는 구조로 전환</li>
+</ul>
+
+<div class="topic">정기 감지, 권장 조치, 보고 경로를 분리해 운영 비용과 실패 범위를 축소</div>
+<ul>
+  <li>정기 메트릭 수집과 임계값 기반 상태 판단은 bash가 처리하고, 권장 조치는 JSON runbook을 우선 적용하며, LLM은 사용자 질문/요약 보고/예외 fallback에만 사용</li>
+  <li>반복적인 정상 체크의 토큰 비용을 0으로 유지하고, LLM 장애 시에도 감지와 1차 알림은 계속 동작하게 설계</li>
+  <li>runbook-first recommendation과 fallback 경계를 분리해 운영자가 신뢰할 수 있는 대응 흐름을 구성</li>
+</ul>
+
+<div class="topic">모니터링 자체 실패를 별도 추적해 감지 불능 상태를 정상으로 오인하지 않도록 설계</div>
+<ul>
+  <li>SSH 실패, 메트릭 파싱 실패, 필수 메트릭 누락, snapshot write 실패를 유형별로 추적하고 같은 유형이 2회 연속 발생하면 모니터링 장애 알림 발송</li>
+  <li>snapshot freshness와 필수 메트릭 누락을 함께 검증해 오래된 snapshot이나 불완전한 수집 결과가 정상처럼 보이지 않도록 처리</li>
+  <li>운영 대상 장애와 운영 파이프라인 장애를 구분해 문제 해결 속도를 높임</li>
+</ul>
+
+<div class="pj-title">Popping-community &mdash; 커뮤니티 서비스 (2025.03 ~ 현재) <a href="https://github.com/Popping-community/Popping-Server" style="color:#1a73e8; font-size:9pt;">GitHub</a></div>
+<div class="pj-meta">개인 프로젝트 &middot; EC2 t2.micro 단일 인스턴스 &middot; 게시글 100만 &middot; 댓글 1,000만 &middot; 좋아요 450만 건</div>
+
+<div class="topic">캐시와 쿼리 구조를 바꿔 대용량 트래픽 병목을 제거</div>
+<ul>
+  <li>재귀 CTE 반복 실행 병목을 Cache-Aside로 개선해 인기 댓글 조회를 <span class="blue">152ms에서 43ms</span>로 단축</li>
+  <li>450만 likes 환경에서 집계/개인화 쿼리 구조를 분리해 응답시간을 <span class="blue">10,460ms에서 167ms</span>로, 에러율을 <span class="blue">15.53%에서 0%</span>로 안정화</li>
+  <li>데이터 구조와 인덱스 조건, 유지 비용까지 고려해 대안을 비교하고 선택</li>
+</ul>
+
+<div class="topic">동시성 문제를 재현하고 멱등 처리로 안정성을 개선</div>
+<ul>
+  <li>동일 사용자 동시 좋아요 요청에서 유니크 제약 예외가 발생하는 문제를 재현</li>
+  <li>ON DUPLICATE KEY UPDATE 기반 멱등 처리로 동시 20 요청에서 <span class="blue">예외 0건</span> 달성</li>
+</ul>
+
+<h2>Education</h2>
+<div class="edu"><b>성공회대학교</b> &mdash; 소프트웨어공학과, 정보통신공학과(복수전공) 학사 <b>3.77 / 4.5</b> (2020.03 ~ 2025.08)</div>
+<div class="edu-sub">자료구조 A+, 운영체제 A+, 데이터통신 A+, 알고리즘 A0, 컴퓨터구조 A0, 컴퓨터 네트워크 A0</div>
+
+</body>
+</html>
