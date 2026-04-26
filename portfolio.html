@@ -91,13 +91,13 @@
 <!-- 1. 댓글 트리 캐싱 -->
 <!-- ============================================ -->
 
-<h3>1. 댓글 트리 조회 병목 해소 &mdash; Cache-Aside + 이벤트 기반 무효화 <a href="https://velog.io/@chooh1010/%EA%B2%8C%EC%8B%9C%EA%B8%80-%EC%A1%B0%ED%9A%8C-%EB%8C%93%EA%B8%80-%EC%B2%AB-%ED%8E%98%EC%9D%B4%EC%A7%80-%EC%BA%90%EC%8B%B1" style="color:#1a73e8; font-size:9pt; font-weight:400;">Blog</a></h3>
+<h3>1. 댓글 트리 생성 병목 해소 &mdash; Cache-Aside + 이벤트 기반 무효화 <a href="https://velog.io/@chooh1010/%EA%B2%8C%EC%8B%9C%EA%B8%80-%EC%A1%B0%ED%9A%8C-%EB%8C%93%EA%B8%80-%EC%B2%AB-%ED%8E%98%EC%9D%B4%EC%A7%80-%EC%BA%90%EC%8B%B1" style="color:#1a73e8; font-size:9pt; font-weight:400;">Blog</a></h3>
 
 <!-- Problem -->
 <div class="step step-problem">Problem</div>
 <ul>
-  <li>게시글 상세 조회마다 댓글 트리를 재귀 CTE로 매번 조회하는 구조</li>
-  <li>동일한 CTE가 반복 실행되어 병목 발생 &mdash; JMeter 100 VUser, 10분간 <b>6,642회</b> 실행 확인</li>
+  <li>게시글 상세 조회 때마다 댓글 트리 전체를 재귀 CTE로 다시 만드는 구조였고, 인기 게시글에 요청이 몰리면 같은 작업이 반복 실행됨</li>
+  <li>JMeter 100 VUser 부하 테스트와 query log로 동일한 CTE가 10분간 <b>6,642회</b> 반복 실행되는 것을 확인</li>
 </ul>
 
 <!-- Analyze -->
@@ -154,73 +154,10 @@
 <div class="note">JMeter 100 VUser, 10분, 게시글 100만 건&middot;댓글 1,000만 건, EC2 실서버 기준</div>
 
 <!-- ============================================ -->
-<!-- 2. 캐시 스탬피드 -->
-<!-- ============================================ -->
-
-<h3>2. 캐시 스탬피드 방지 &mdash; Caffeine 원자적 로딩 <a href="https://velog.io/@chooh1010/%EC%BA%90%EC%8B%9C-%EC%8A%A4%ED%83%AC%ED%94%BC%EB%93%9C-%EB%B0%A9%EC%A7%80" style="color:#1a73e8; font-size:9pt; font-weight:400;">Blog</a></h3>
-
-<!-- Problem -->
-<div class="step step-problem">Problem</div>
-<ul>
-  <li>캐시가 evict된 직후 동일 postId에 동시 요청이 몰리면 재귀 CTE가 중복 실행 &mdash; JMeter 50건 동시 요청에서 <b>10~17건</b>, CountDownLatch 기반 단위 테스트에서 <b>50건 전부</b> 중복 실행 확인</li>
-  <li>기존 구조는 <code>cache.get &rarr; miss &rarr; build &rarr; cache.put</code>으로, get과 put이 분리되어 여러 스레드가 동시에 DB 재생성 경로로 진입</li>
-</ul>
-<div class="code"><span class="cm">// Before: get과 put이 분리 → 캐시 스탬피드 발생</span>
-CommentPageResponse cached = cache.get(postId, CommentPageResponse.class);
-if (cached != null) {
-    return cached;
-}
-CommentPageResponse fresh = buildCommentPage(postId, 0);  <span class="cm">// 여러 스레드가 동시 진입</span>
-cache.put(postId, fresh);</div>
-
-<!-- Analyze -->
-<div class="step step-analyze">Analyze</div>
-<table class="compare">
-  <tr><th style="width:150px;">검토 방식</th><th>검토 결과</th><th style="width:55px;">판단</th></tr>
-  <tr>
-    <td>전역 락 (synchronized)</td>
-    <td>서로 다른 postId 요청까지 함께 대기시켜 불필요한 처리량 저하</td>
-    <td><span class="tag-reject">기각</span></td>
-  </tr>
-  <tr>
-    <td>ConcurrentHashMap<br>per-key 락 직접 구현</td>
-    <td>캐시와 별도로 락 생명주기를 관리하는 복잡성이 추가됨</td>
-    <td><span class="tag-reject">기각</span></td>
-  </tr>
-  <tr>
-    <td><b>Caffeine<br>cache.get(key, Callable)</b></td>
-    <td>내부적으로 per-key 원자적 로딩을 제공. 락 생명주기를 캐시 엔트리에 맞춰 자동 관리</td>
-    <td><span class="tag-accept">채택</span></td>
-  </tr>
-</table>
-
-<!-- Action -->
-<div class="step step-action">Action</div>
-<div class="code"><span class="cm">// After: 원자적 로딩 → 동일 postId에 대해 1회만 실행</span>
-return cache.get(postId, () -&gt; readOnlyTx.execute(status -&gt; buildCommentPage(postId, 0)));</div>
-<ul>
-  <li><code>cache.get(key, Callable)</code>로 동일 key에 대한 CTE 실행을 1회로 제한, 다른 key는 병렬 처리 유지</li>
-  <li>Callable 내부에서 <code>TransactionTemplate</code>으로 트랜잭션을 감싸, 향후 <code>refreshAfterWrite</code> 전환 시 Caffeine 백그라운드 스레드(ForkJoinPool)에서 실행되더라도 트랜잭션 컨텍스트 보장</li>
-</ul>
-
-<!-- Result -->
-<div class="step step-result">Result</div>
-<div class="result-box">
-  <table>
-    <tr><td class="label">evict 직후 JMeter 50 VUser 동시 요청 (ramp 0s)</td><td class="before">CTE 10~17건 중복</td><td class="arrow">&rarr;</td><td class="after">CTE 1건만 실행</td></tr>
-  </table>
-</div>
-<ul>
-  <li>나머지 49건은 캐시 히트로 처리, key 단위 동작이므로 다른 게시글은 병렬 처리 유지</li>
-  <li>CountDownLatch 기반 단위 테스트(50 스레드 동시 실행)로 CTE 실행 1회 고정 검증 통과</li>
-  <li><b>트레이드오프:</b> 캐시 미스 시 첫 요청 완료까지 후속 요청 대기 (테스트 기준 최대 315ms)</li>
-</ul>
-
-<!-- ============================================ -->
 <!-- 3. 좋아요 멱등 처리 -->
 <!-- ============================================ -->
 
-<h3>3. 좋아요 동시 요청 멱등 처리 &mdash; ON DUPLICATE KEY UPDATE <a href="https://velog.io/@chooh1010/%EC%A2%8B%EC%95%84%EC%9A%94-%EC%A4%91%EB%B3%B5-insert-%EA%B2%BD%EC%9F%81-%ED%95%B4%EA%B2%B0-3395eni0" style="color:#1a73e8; font-size:9pt; font-weight:400;">Blog</a></h3>
+<h3>2. 좋아요 동시 요청 멱등 처리 &mdash; ON DUPLICATE KEY UPDATE <a href="https://velog.io/@chooh1010/%EC%A2%8B%EC%95%84%EC%9A%94-%EC%A4%91%EB%B3%B5-insert-%EA%B2%BD%EC%9F%81-%ED%95%B4%EA%B2%B0-3395eni0" style="color:#1a73e8; font-size:9pt; font-weight:400;">Blog</a></h3>
 
 <!-- Problem -->
 <div class="step step-problem">Problem</div>
@@ -286,13 +223,13 @@ if (affected &gt; 0) {
 <!-- 4. 집계 쿼리 분리 -->
 <!-- ============================================ -->
 
-<h3>4. 대용량 좋아요 집계 병목 제거 &mdash; 쿼리 분리 + 비정규화 <a href="https://velog.io/@chooh1010/likes-%ED%92%80%EC%8A%A4%EC%BA%94-%EC%A0%9C%EA%B1%B0%EC%99%80-%EC%A7%91%EA%B3%84-%EC%BF%BC%EB%A6%AC-%EB%B6%84%EB%A6%AC" style="color:#1a73e8; font-size:9pt; font-weight:400;">Blog</a></h3>
+<h3>3. 대용량 좋아요 집계 병목 제거 &mdash; 쿼리 분리 + 비정규화 <a href="https://velog.io/@chooh1010/likes-%ED%92%80%EC%8A%A4%EC%BA%94-%EC%A0%9C%EA%B1%B0%EC%99%80-%EC%A7%91%EA%B3%84-%EC%BF%BC%EB%A6%AC-%EB%B6%84%EB%A6%AC" style="color:#1a73e8; font-size:9pt; font-weight:400;">Blog</a></h3>
 
 <!-- Problem -->
 <div class="step step-problem">Problem</div>
 <ul>
   <li>likes 450만 건 적재 후 부하 테스트 &rarr; <b>에러율 15.53%</b>, 평균 응답시간 <b>10,460ms</b>까지 악화</li>
-  <li>Slow Query Log 확인 결과, 집계와 개인화를 한 쿼리에서 처리하는 구조 때문에 WHERE 조건이 <code>target_type, target_id</code>로 시작 &rarr; UK 선두 컬럼(<code>user_id</code>)과 불일치, Leftmost Prefix Rule에 의해 풀스캔 발생</li>
+  <li>좋아요 수 집계와 "내가 좋아요를 눌렀는지" 확인을 like 테이블에서 하나의 쿼리로 함께 처리했고, Slow Query Log에서 WHERE 조건이 <code>target_type, target_id</code>로 시작해 UK 선두 컬럼(<code>user_id</code>)을 타지 못하고 풀스캔이 발생하는 것을 확인</li>
 </ul>
 <div class="diagram">Before (단일 쿼리)
   SELECT COUNT(*), EXISTS(...)   &larr; likes 450만 건 풀스캔
@@ -346,7 +283,7 @@ if (affected &gt; 0) {
 <!-- 5. CI/CD -->
 <!-- ============================================ -->
 
-<h3>5. GitHub Actions&middot;Jib 기반 CI/CD 파이프라인 및 모니터링 구축</h3>
+<h3>4. GitHub Actions&middot;Jib 기반 CI/CD 파이프라인 및 모니터링 구축</h3>
 <div class="diagram">main push
    &darr;
 GitHub Actions
@@ -389,7 +326,7 @@ Prometheus &rarr; Grafana (모니터링)</div>
          ├─ 10분 snapshot 저장
          ├─ counter delta 기반 트래픽 지표/응답시간/에러율 계산
          ├─ 임계값 기반 상태 전이 감지 (Memory ≥80% WARN, ≥95% CRITICAL 등)
-         └─ Discord Webhook 알림 + runbook 기반 권장 조치
+         └─ Discord Webhook 알림 + 대응 조치 매뉴얼(JSON runbook) 기반 권장 조치
 </div>
 <ul>
   <li>SSH로 actuator, node-exporter, mysqld-exporter 메트릭을 10분마다 수집해 snapshot으로 저장</li>
@@ -433,8 +370,8 @@ Prometheus &rarr; Grafana (모니터링)</div>
     <td><span class="tag-reject">기각</span></td>
   </tr>
   <tr>
-    <td><b>임계값 기반 상태 판단 +<br>Runbook 우선 +<br>LLM은 해석에만</b></td>
-    <td>정기 메트릭 수집과 임계값 비교는 bash가 처리하고, 권장 조치는 JSON runbook을 우선 적용하며, LLM은 사용자 질문&middot;리포트 작성&middot;runbook 미매칭 fallback처럼 해석이 필요한 경우에만 사용</td>
+    <td><b>임계값 기반 상태 판단 +<br>대응 조치 매뉴얼 우선 +<br>LLM은 해석에만</b></td>
+    <td>정기 메트릭 수집과 임계값 비교는 bash가 처리하고, 권장 조치는 대응 조치 매뉴얼(JSON runbook)을 우선 적용하며, LLM은 사용자 질문&middot;리포트 작성&middot;매뉴얼 미매칭 fallback처럼 해석이 필요한 경우에만 사용</td>
     <td><span class="tag-accept">채택</span></td>
   </tr>
 </table>
@@ -447,7 +384,7 @@ Prometheus &rarr; Grafana (모니터링)</div>
 State Layer (snapshot)
   └─ /tmp/health-check-alerts/status-current.env
          ↓
-Recommendation Layer (JSON runbook, LLM 없음)
+Recommendation Layer (대응 조치 매뉴얼, LLM 없음)
   └─ JSON runbook: 알림 종류&middot;심각도별 권장 조치 우선 적용
   └─ 미매칭 시에만 LLM fallback
          ↓
@@ -458,8 +395,8 @@ Notification Layer
   └─ Discord Webhook</div>
 <ul>
   <li>정기 감지와 기본 장애 알림은 Bash 임계값 기반으로 처리해 정상 반복 체크의 토큰 비용 0원, LLM 장애 시에도 감지와 알림은 계속 동작</li>
-  <li>JSON runbook에 정의한 알림 종류&middot;심각도별 권장 조치를 우선 적용하고, 예외적인 알림만 LLM fallback으로 처리</li>
-  <li>LLM은 사용자 질문, Daily Summary&middot;Full Report 작성, runbook에 직접 절차가 없는 알림의 fallback처럼 해석이 필요한 구간에만 사용해 수집&middot;판단 경로와 분석 경로를 분리</li>
+  <li>대응 조치 매뉴얼(JSON runbook)에 정의한 알림 종류&middot;심각도별 권장 조치를 우선 적용하고, 예외적인 알림만 LLM fallback으로 처리</li>
+  <li>LLM은 사용자 질문, Daily Summary&middot;Full Report 작성, 대응 조치 매뉴얼에 직접 절차가 없는 알림의 fallback처럼 해석이 필요한 구간에만 사용해 수집&middot;판단 경로와 분석 경로를 분리</li>
   <li>Full Report는 helper가 <code>full_report_should_report=true</code>로 판단한 경우에만 LLM 호출, 변화 없으면 생략</li>
 </ul>
 
@@ -468,7 +405,7 @@ Notification Layer
 <div class="result-box">
   <table>
     <tr><td class="label">정상 상태 토큰 비용</td><td class="before">매 10분마다 소비</td><td class="arrow">&rarr;</td><td class="after">0원 (bash 처리)</td></tr>
-    <tr><td class="label">권장 조치 경로</td><td class="before">매번 LLM 호출</td><td class="arrow">&rarr;</td><td class="after">runbook 우선, 미매칭만 LLM fallback</td></tr>
+    <tr><td class="label">권장 조치 경로</td><td class="before">매번 LLM 호출</td><td class="arrow">&rarr;</td><td class="after">대응 조치 매뉴얼 우선, 미매칭만 LLM fallback</td></tr>
     <tr><td class="label">LLM provider 장애 시</td><td class="before">핵심 감지 경로 영향</td><td class="arrow">&rarr;</td><td class="after">감지&middot;1차 알림은 계속 동작</td></tr>
   </table>
 </div>
