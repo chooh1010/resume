@@ -263,7 +263,7 @@ if (affectedRows &gt; 0) {
   </tr>
   <tr>
     <td><b>쿼리 구조 분리 +<br>비정규화 칼럼</b></td>
-    <td>집계는 댓글 테이블의 비정규화 칼럼에서 직접 읽고, 개인화만 사용자 기준 유니크 인덱스를 활용 &mdash; 별도 집계 인덱스 없이 해결 가능</td>
+    <td>집계는 각 테이블의 비정규화 칼럼에서 직접 읽고, 개인화만 사용자 기준 유니크 인덱스를 활용 &mdash; 별도 집계 인덱스 없이 해결 가능</td>
     <td><span class="tag-accept">채택</span></td>
   </tr>
 </table>
@@ -271,7 +271,7 @@ if (affectedRows &gt; 0) {
 <!-- Action -->
 <div class="step step-action">Action</div>
 <div class="diagram">After (분리)
-  [1] 집계값   &larr; comment.like_count (비정규화 칼럼, 인덱스 불필요)
+  [1] 집계값   &larr; 각 테이블의 like_count (비정규화 칼럼, 인덱스 불필요)
   [2] 개인 반응 &larr; SELECT ... FROM likes WHERE user_id = ? AND target_id IN (...)
                     <span style="color:#1e8e3e;">&uarr; 사용자 기준 유니크 인덱스 활용, 인덱스 범위 탐색</span></div>
 <ul>
@@ -503,7 +503,7 @@ snapshot freshness 판정
 
 <div class="step step-problem">Problem</div>
 <ul>
-  <li>수동 문서 방식은 기능이 바뀔 때마다 문서가 늦게 갱신되어, 협업 중 잘못된 명세를 참고할 가능성이 있었음</li>
+  <li>API 명세를 수동으로 공유하다 보니 프론트엔드 팀원이 변경 전 명세로 작업해 재작업이 발생한 적이 있었음</li>
 </ul>
 
 <div class="step step-analyze">Analyze</div>
@@ -535,33 +535,6 @@ snapshot freshness 판정
   <li>프로덕션 코드 오염 없이 API 문서 신뢰도 확보</li>
 </ul>
 
-<!-- FINNA 2 -->
-<div class="avoid-break">
-<h3>2. GitHub Actions 기반 CI/CD 자동화</h3>
-
-<div class="step step-problem">Problem</div>
-<ul>
-  <li>로컬 빌드, Docker 이미지 생성, Docker Hub push, EC2 재배포까지 수동으로 처리</li>
-</ul>
-</div>
-
-<div class="step step-action">Action</div>
-<div class="diagram">main push
-   &darr;
-GitHub Actions
-   &boxur; REST Docs 빌드
-   &boxur; 컨테이너 이미지 생성 &rarr; Docker Hub push
-   &boxdr; SSH &rarr; EC2 docker-compose up -d</div>
-<ul>
-  <li>컨테이너 이미지를 빌드 도구와 직접 연결해 <b>Dockerfile 없이도</b> 이미지를 생성하고, 레이어 캐싱으로 빌드 효율을 높임</li>
-  <li>Docker Hub Access Token, SSH 키 등 민감 정보는 GitHub Secrets로 분리 관리</li>
-</ul>
-
-<div class="step step-result">Result</div>
-<ul>
-  <li>문서 생성, 이미지 빌드, 배포가 하나의 파이프라인으로 연결</li>
-  <li>수동 배포 절차를 제거해 팀이 기능 개발과 검증에 집중할 수 있도록 지원</li>
-</ul>
 
 </body>
 </html>
