@@ -832,8 +832,89 @@
                 </div>
 
                 <figure class="hero-diagram fade-up">
-                    <img src="./images/architecture-simple.svg" alt="부하테스트 환경 아키텍처: JMeter가 HAProxy를 거쳐 App 2대로 분산되고, MySQL Primary/Replica가 GTID 복제로 연결되며 Prometheus와 Grafana가 모니터링하는 구조" class="grafana-img" onerror="this.parentElement.style.display='none'">
-                    <figcaption>부하테스트 환경 아키텍처 — HAProxy · App×2 · MySQL Primary/Replica · Prometheus/Grafana (클릭하면 확대)</figcaption>
+                    <svg viewBox="0 0 1160 660" role="img" aria-label="부하테스트 환경 아키텍처: JMeter가 HAProxy를 거쳐 App 2대로 분산되고, MySQL Primary/Replica가 GTID 복제로 연결되며 Prometheus와 Grafana가 모니터링하는 구조" style="width:100%;height:auto;display:block;font-family:var(--font-ko);">
+                        <defs>
+                            <marker id="ar-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                                <path d="M 0 1 L 9 5 L 0 9 z" fill="#98A2B3"/>
+                            </marker>
+                            <marker id="ar-indigo" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                                <path d="M 0 1 L 9 5 L 0 9 z" fill="var(--primary)"/>
+                            </marker>
+                            <marker id="ar-teal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                                <path d="M 0 1 L 9 5 L 0 9 z" fill="var(--secondary)"/>
+                            </marker>
+                        </defs>
+
+                        <text x="355" y="88" text-anchor="middle" font-size="12" font-weight="600" letter-spacing="2" fill="#98A2B3">LOAD BALANCER</text>
+                        <text x="625" y="88" text-anchor="middle" font-size="12" font-weight="600" letter-spacing="2" fill="#98A2B3">APPLICATION ×2</text>
+                        <text x="945" y="88" text-anchor="middle" font-size="12" font-weight="600" letter-spacing="2" fill="#98A2B3">DATABASE</text>
+
+                        <line x1="192" y1="302" x2="258" y2="302" stroke="#98A2B3" stroke-width="2" marker-end="url(#ar-gray)"/>
+                        <text x="225" y="290" text-anchor="middle" font-size="12" fill="var(--text-sub)" font-family="var(--font-mono)">HTTP</text>
+
+                        <path d="M 447 284 C 486 284 486 174 512 174" fill="none" stroke="#98A2B3" stroke-width="2" marker-end="url(#ar-gray)"/>
+                        <path d="M 447 320 C 486 320 486 430 512 430" fill="none" stroke="#98A2B3" stroke-width="2" marker-end="url(#ar-gray)"/>
+                        <text x="487" y="308" text-anchor="middle" font-size="11.5" fill="#98A2B3">round robin</text>
+                        <text x="487" y="322" text-anchor="middle" font-size="11.5" fill="#98A2B3">+ cookie</text>
+
+                        <line x1="732" y1="200" x2="838" y2="380" stroke="var(--border)" stroke-width="1.5" stroke-dasharray="5 5"/>
+                        <line x1="732" y1="404" x2="838" y2="224" stroke="var(--border)" stroke-width="1.5" stroke-dasharray="5 5"/>
+
+                        <line x1="732" y1="172" x2="826" y2="170" stroke="var(--primary)" stroke-width="2.5" marker-end="url(#ar-indigo)"/>
+                        <text x="779" y="156" text-anchor="middle" font-size="13" font-weight="700" fill="var(--primary)" font-family="var(--font-mono)">Write</text>
+
+                        <line x1="732" y1="432" x2="826" y2="434" stroke="var(--secondary)" stroke-width="2.5" marker-end="url(#ar-teal)"/>
+                        <text x="779" y="420" text-anchor="middle" font-size="13" font-weight="700" fill="var(--secondary)" font-family="var(--font-mono)">Read</text>
+
+                        <line x1="945" y1="234" x2="945" y2="368" stroke="var(--primary)" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#ar-indigo)"/>
+                        <text x="958" y="296" font-size="12" fill="var(--primary)" font-family="var(--font-mono)">GTID</text>
+                        <text x="958" y="312" font-size="12" fill="var(--primary)" font-family="var(--font-mono)">Replication</text>
+
+                        <rect x="22" y="248" width="170" height="108" rx="16" fill="var(--card-bg)" stroke="var(--border)" stroke-width="1.5"/>
+                        <text x="107" y="296" text-anchor="middle" font-size="17" font-weight="700" fill="var(--text-main)">JMeter</text>
+                        <text x="107" y="322" text-anchor="middle" font-size="13" fill="var(--text-sub)" font-family="var(--font-mono)">500 VUser</text>
+
+                        <rect x="266" y="248" width="180" height="108" rx="16" fill="var(--primary-light)" stroke="#C7CAFB" stroke-width="1.5"/>
+                        <text x="356" y="296" text-anchor="middle" font-size="17" font-weight="700" fill="var(--primary)">HAProxy</text>
+                        <text x="356" y="322" text-anchor="middle" font-size="13" fill="var(--primary)">Sticky Session LB</text>
+
+                        <rect x="516" y="120" width="216" height="108" rx="16" fill="var(--card-bg)" stroke="var(--border)" stroke-width="1.5"/>
+                        <circle cx="548" cy="163" r="5" fill="var(--primary)"/>
+                        <text x="562" y="168" font-size="16" font-weight="700" fill="var(--text-main)">App-1 · Spring Boot</text>
+                        <text x="562" y="194" font-size="13" fill="var(--text-sub)">Caffeine Cache</text>
+
+                        <rect x="516" y="376" width="216" height="108" rx="16" fill="var(--card-bg)" stroke="var(--border)" stroke-width="1.5"/>
+                        <circle cx="548" cy="419" r="5" fill="var(--primary)"/>
+                        <text x="562" y="424" font-size="16" font-weight="700" fill="var(--text-main)">App-2 · Spring Boot</text>
+                        <text x="562" y="450" font-size="13" fill="var(--text-sub)">Caffeine Cache</text>
+
+                        <rect x="830" y="112" width="230" height="118" rx="16" fill="var(--card-bg)" stroke="#C7CAFB" stroke-width="2"/>
+                        <rect x="830" y="112" width="6" height="118" rx="3" fill="var(--primary)"/>
+                        <text x="858" y="160" font-size="16" font-weight="700" fill="var(--text-main)">MySQL Primary</text>
+                        <text x="858" y="186" font-size="13" fill="var(--text-sub)">쓰기 전용 처리</text>
+                        <text x="858" y="208" font-size="12" fill="#98A2B3" font-family="var(--font-mono)">GTID + ROW binlog</text>
+
+                        <rect x="830" y="376" width="230" height="118" rx="16" fill="var(--card-bg)" stroke="#B5E8E1" stroke-width="2"/>
+                        <rect x="830" y="376" width="6" height="118" rx="3" fill="var(--secondary)"/>
+                        <text x="858" y="424" font-size="16" font-weight="700" fill="var(--text-main)">MySQL Replica</text>
+                        <text x="858" y="450" font-size="13" fill="var(--text-sub)">읽기 트래픽 ~90% 분산</text>
+                        <text x="858" y="472" font-size="12" fill="#98A2B3" font-family="var(--font-mono)">readOnly=true 라우팅</text>
+
+                        <text x="580" y="540" text-anchor="middle" font-size="12.5" fill="#98A2B3">* 쓰기 직후 3초간은 Primary에서 읽어 본인 쓰기 정합성 보장 (Sticky Primary)</text>
+
+                        <rect x="22" y="566" width="1116" height="72" rx="14" fill="var(--bg-color)" stroke="var(--border)" stroke-width="1.5" stroke-dasharray="6 5"/>
+                        <text x="52" y="608" font-size="13" font-weight="600" fill="var(--text-sub)">Monitoring</text>
+                        <rect x="170" y="584" width="130" height="36" rx="18" fill="var(--card-bg)" stroke="var(--border)" stroke-width="1.5"/>
+                        <text x="235" y="607" text-anchor="middle" font-size="13" fill="var(--text-main)">Prometheus</text>
+                        <rect x="316" y="584" width="110" height="36" rx="18" fill="var(--card-bg)" stroke="var(--border)" stroke-width="1.5"/>
+                        <text x="371" y="607" text-anchor="middle" font-size="13" fill="var(--text-main)">Grafana</text>
+                        <rect x="442" y="584" width="150" height="36" rx="18" fill="var(--card-bg)" stroke="var(--border)" stroke-width="1.5"/>
+                        <text x="517" y="607" text-anchor="middle" font-size="13" fill="var(--text-main)">mysqld-exporter</text>
+                        <rect x="608" y="584" width="110" height="36" rx="18" fill="var(--card-bg)" stroke="var(--border)" stroke-width="1.5"/>
+                        <text x="663" y="607" text-anchor="middle" font-size="13" fill="var(--text-main)">cAdvisor</text>
+                        <text x="1108" y="608" text-anchor="end" font-size="12" fill="#98A2B3" font-family="var(--font-mono)">TPS · p50/p95/p99 · CPU</text>
+                    </svg>
+                    <figcaption>부하테스트 환경 아키텍처 — HAProxy · App×2 · MySQL Primary/Replica · Prometheus/Grafana</figcaption>
                 </figure>
 
                 <div class="metrics-grid fade-up">
