@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1160 660" font-family="'Pretendard','Inter','Segoe UI','Malgun Gothic',sans-serif">
+  <defs>
+    <marker id="arrow-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#98A2B3"/>
+    </marker>
+    <marker id="arrow-indigo" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#5B5FEF"/>
+    </marker>
+    <marker id="arrow-teal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#22B8A7"/>
+    </marker>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#111827" flood-opacity="0.06"/>
+    </filter>
+  </defs>
+
+  <!-- background -->
+  <rect x="0" y="0" width="1160" height="660" fill="#FFFFFF"/>
+
+  <!-- tier labels -->
+  <text x="355" y="88" text-anchor="middle" font-size="12" font-weight="600" letter-spacing="2" fill="#98A2B3">LOAD BALANCER</text>
+  <text x="625" y="88" text-anchor="middle" font-size="12" font-weight="600" letter-spacing="2" fill="#98A2B3">APPLICATION ×2</text>
+  <text x="945" y="88" text-anchor="middle" font-size="12" font-weight="600" letter-spacing="2" fill="#98A2B3">DATABASE</text>
+
+  <!-- ===== edges (behind nodes) ===== -->
+  <!-- JMeter -> HAProxy -->
+  <line x1="192" y1="302" x2="258" y2="302" stroke="#98A2B3" stroke-width="2" marker-end="url(#arrow-gray)"/>
+  <text x="225" y="290" text-anchor="middle" font-size="12" fill="#667085" font-family="'JetBrains Mono','Consolas',monospace">HTTP</text>
+
+  <!-- HAProxy -> apps -->
+  <path d="M 447 284 C 486 284 486 174 512 174" fill="none" stroke="#98A2B3" stroke-width="2" marker-end="url(#arrow-gray)"/>
+  <path d="M 447 320 C 486 320 486 430 512 430" fill="none" stroke="#98A2B3" stroke-width="2" marker-end="url(#arrow-gray)"/>
+  <text x="487" y="308" text-anchor="middle" font-size="11.5" fill="#98A2B3">round robin</text>
+  <text x="487" y="322" text-anchor="middle" font-size="11.5" fill="#98A2B3">+ cookie</text>
+
+  <!-- cross paths (faint) -->
+  <line x1="732" y1="200" x2="838" y2="380" stroke="#D8DCE3" stroke-width="1.5" stroke-dasharray="5 5"/>
+  <line x1="732" y1="404" x2="838" y2="224" stroke="#D8DCE3" stroke-width="1.5" stroke-dasharray="5 5"/>
+
+  <!-- app-1 -> Primary (Write) -->
+  <line x1="732" y1="172" x2="826" y2="170" stroke="#5B5FEF" stroke-width="2.5" marker-end="url(#arrow-indigo)"/>
+  <text x="779" y="156" text-anchor="middle" font-size="13" font-weight="700" fill="#5B5FEF" font-family="'JetBrains Mono','Consolas',monospace">Write</text>
+
+  <!-- app-2 -> Replica (Read) -->
+  <line x1="732" y1="432" x2="826" y2="434" stroke="#22B8A7" stroke-width="2.5" marker-end="url(#arrow-teal)"/>
+  <text x="779" y="420" text-anchor="middle" font-size="13" font-weight="700" fill="#22B8A7" font-family="'JetBrains Mono','Consolas',monospace">Read</text>
+
+  <!-- GTID replication -->
+  <line x1="945" y1="234" x2="945" y2="368" stroke="#5B5FEF" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#arrow-indigo)"/>
+  <text x="958" y="296" font-size="12" fill="#5B5FEF" font-family="'JetBrains Mono','Consolas',monospace">GTID</text>
+  <text x="958" y="312" font-size="12" fill="#5B5FEF" font-family="'JetBrains Mono','Consolas',monospace">Replication</text>
+
+  <!-- ===== nodes ===== -->
+  <!-- JMeter -->
+  <g filter="url(#soft)">
+    <rect x="22" y="248" width="170" height="108" rx="16" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1.5"/>
+  </g>
+  <text x="107" y="296" text-anchor="middle" font-size="17" font-weight="700" fill="#111827">JMeter</text>
+  <text x="107" y="322" text-anchor="middle" font-size="13" fill="#667085" font-family="'JetBrains Mono','Consolas',monospace">500 VUser</text>
+
+  <!-- HAProxy -->
+  <g filter="url(#soft)">
+    <rect x="266" y="248" width="180" height="108" rx="16" fill="#EEF0FF" stroke="#C7CAFB" stroke-width="1.5"/>
+  </g>
+  <text x="356" y="296" text-anchor="middle" font-size="17" font-weight="700" fill="#3D40C6">HAProxy</text>
+  <text x="356" y="322" text-anchor="middle" font-size="13" fill="#5B5FEF">Sticky Session LB</text>
+
+  <!-- app-1 -->
+  <g filter="url(#soft)">
+    <rect x="516" y="120" width="216" height="108" rx="16" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1.5"/>
+  </g>
+  <circle cx="548" cy="163" r="5" fill="#5B5FEF"/>
+  <text x="562" y="168" font-size="16" font-weight="700" fill="#111827">App-1 · Spring Boot</text>
+  <text x="562" y="194" font-size="13" fill="#667085">Caffeine Cache</text>
+
+  <!-- app-2 -->
+  <g filter="url(#soft)">
+    <rect x="516" y="376" width="216" height="108" rx="16" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1.5"/>
+  </g>
+  <circle cx="548" cy="419" r="5" fill="#5B5FEF"/>
+  <text x="562" y="424" font-size="16" font-weight="700" fill="#111827">App-2 · Spring Boot</text>
+  <text x="562" y="450" font-size="13" fill="#667085">Caffeine Cache</text>
+
+  <!-- MySQL Primary -->
+  <g filter="url(#soft)">
+    <rect x="830" y="112" width="230" height="118" rx="16" fill="#FFFFFF" stroke="#C7CAFB" stroke-width="2"/>
+  </g>
+  <rect x="830" y="112" width="6" height="118" rx="3" fill="#5B5FEF"/>
+  <text x="858" y="160" font-size="16" font-weight="700" fill="#111827">MySQL Primary</text>
+  <text x="858" y="186" font-size="13" fill="#667085">쓰기 전용 처리</text>
+  <text x="858" y="208" font-size="12" fill="#98A2B3" font-family="'JetBrains Mono','Consolas',monospace">GTID + ROW binlog</text>
+
+  <!-- MySQL Replica -->
+  <g filter="url(#soft)">
+    <rect x="830" y="376" width="230" height="118" rx="16" fill="#FFFFFF" stroke="#B5E8E1" stroke-width="2"/>
+  </g>
+  <rect x="830" y="376" width="6" height="118" rx="3" fill="#22B8A7"/>
+  <text x="858" y="424" font-size="16" font-weight="700" fill="#111827">MySQL Replica</text>
+  <text x="858" y="450" font-size="13" fill="#667085">읽기 트래픽 ~90% 분산</text>
+  <text x="858" y="472" font-size="12" fill="#98A2B3" font-family="'JetBrains Mono','Consolas',monospace">readOnly=true 라우팅</text>
+
+  <!-- sticky primary footnote -->
+  <text x="580" y="540" text-anchor="middle" font-size="12.5" fill="#98A2B3">* 쓰기 직후 3초간은 Primary에서 읽어 본인 쓰기 정합성 보장 (Sticky Primary)</text>
+
+  <!-- monitoring strip -->
+  <rect x="22" y="566" width="1116" height="72" rx="14" fill="#FAFAFC" stroke="#D8DCE3" stroke-width="1.5" stroke-dasharray="6 5"/>
+  <text x="52" y="608" font-size="13" font-weight="600" fill="#667085">Monitoring</text>
+  <rect x="170" y="584" width="130" height="36" rx="18" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1.5"/>
+  <text x="235" y="607" text-anchor="middle" font-size="13" fill="#111827">Prometheus</text>
+  <rect x="316" y="584" width="110" height="36" rx="18" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1.5"/>
+  <text x="371" y="607" text-anchor="middle" font-size="13" fill="#111827">Grafana</text>
+  <rect x="442" y="584" width="150" height="36" rx="18" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1.5"/>
+  <text x="517" y="607" text-anchor="middle" font-size="13" fill="#111827">mysqld-exporter</text>
+  <rect x="608" y="584" width="110" height="36" rx="18" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1.5"/>
+  <text x="663" y="607" text-anchor="middle" font-size="13" fill="#111827">cAdvisor</text>
+  <text x="1108" y="608" text-anchor="end" font-size="12" fill="#98A2B3" font-family="'JetBrains Mono','Consolas',monospace">TPS · p50/p95/p99 · CPU</text>
+</svg>
