@@ -241,6 +241,8 @@
             padding: 24px;
             box-shadow: var(--shadow);
             margin: 0 0 80px;
+            /* 크롬 강제 다크 모드가 SVG 텍스트만 반전시켜 깨지는 것 방지 */
+            color-scheme: only light;
         }
 
         .hero-diagram img {
