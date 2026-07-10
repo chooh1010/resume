@@ -4,6 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>조용현 | Backend Engineer Portfolio</title>
+    <meta name="description" content="병목을 따라 시스템을 확장한 과정을 기록한 백엔드 포트폴리오. Scale Out으로 TPS 92% 향상, Read Replica로 응답시간 67% 개선을 부하테스트로 검증했습니다.">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="조용현 | Backend Engineer Portfolio">
+    <meta property="og:description" content="Scale Out으로 TPS 92% 향상, Read Replica로 응답시간 67% 개선. 문제를 재현하고 결과를 검증하는 백엔드 개발자입니다.">
+    <meta property="og:url" content="https://chooh1010.github.io/resume/">
+    <meta property="og:image" content="https://chooh1010.github.io/resume/images/architecture-v2.png">
+    <meta name="twitter:card" content="summary_large_image">
+
+    <!-- Favicon (emoji, no external file) -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📈</text></svg>">
     
     <!-- 폰트 로드: Pretendard(한글), Inter(영문), JetBrains Mono(수치) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -219,6 +231,31 @@
             gap: 16px;
             justify-content: center;
             margin-bottom: 80px;
+        }
+
+        /* 히어로 아키텍처 다이어그램 */
+        .hero-diagram {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-card);
+            padding: 24px;
+            box-shadow: var(--shadow);
+            margin: 0 0 80px;
+        }
+
+        .hero-diagram img {
+            width: 100%;
+            height: auto;
+            display: block;
+            border-radius: 12px;
+            cursor: zoom-in;
+        }
+
+        .hero-diagram figcaption {
+            font-size: 14px;
+            color: var(--text-sub);
+            margin-top: 16px;
+            text-align: center;
         }
 
         /* 지표 카드 (Hero 하단) */
@@ -793,6 +830,11 @@
                         <a href="https://github.com/chooh1010" target="_blank" class="btn btn-outline">GitHub 방문</a>
                     </div>
                 </div>
+
+                <figure class="hero-diagram fade-up">
+                    <img src="./images/architecture-v2.png" alt="부하테스트 환경 아키텍처: JMeter가 HAProxy를 거쳐 App 2대로 분산되고, MySQL Primary/Replica가 GTID 복제로 연결되며 Prometheus와 Grafana가 모니터링하는 구조" class="grafana-img" onerror="this.parentElement.style.display='none'">
+                    <figcaption>부하테스트 환경 아키텍처 — HAProxy · App×2 · MySQL Primary/Replica · Prometheus/Grafana (클릭하면 확대)</figcaption>
+                </figure>
 
                 <div class="metrics-grid fade-up">
                     <div class="metric-card">
