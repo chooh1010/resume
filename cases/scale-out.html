@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="ko" class="scroll-smooth motion-reduce:scroll-auto">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>애플리케이션 Scale Out | 조용현 포트폴리오</title>
+    <meta name="description" content="App CPU 200% 포화 병목을 HAProxy 기반 수평 확장으로 해소. TPS 92% 향상, 평균 응답시간 96% 감소를 부하테스트로 검증했습니다.">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="article">
+    <meta property="og:title" content="애플리케이션 Scale Out | 조용현 포트폴리오">
+    <meta property="og:description" content="App CPU 200% 포화 병목을 HAProxy 기반 수평 확장으로 해소. TPS 274/s → 527/s (+92.3%).">
+    <meta property="og:url" content="https://chooh1010.github.io/resume/cases/scale-out.html">
+
+    <!-- Favicon (emoji, no external file) -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📈</text></svg>">
+
+    <!-- 폰트 로드: Pretendard(한글), Inter(영문), JetBrains Mono(수치) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css" />
+
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        page: '#F7F8FC',
+                        card: '#FFFFFF',
+                        main: '#111827',
+                        sub: '#667085',
+                        primary: '#5B5FEF',
+                        'primary-dark': '#4A4DD9',
+                        'primary-light': '#EEF0FF',
+                        secondary: '#22B8A7',
+                        line: '#E5E7EB',
+                    },
+                    fontFamily: {
+                        sans: ['Pretendard', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'Roboto', 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', 'sans-serif'],
+                        en: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    boxShadow: {
+                        soft: '0 10px 40px -10px rgba(0,0,0,0.05)',
+                        'soft-hover': '0 15px 40px -10px rgba(91,95,239,0.1)',
+                    },
+                    maxWidth: {
+                        page: '1200px',
+                    },
+                },
+            },
+        };
+    </script>
+</head>
+<body class="bg-page text-main font-sans leading-[1.6] overflow-x-hidden">
+
+    <!-- 헤더 -->
+    <header class="fixed top-0 w-full bg-[rgba(247,248,252,0.8)] backdrop-blur-md z-[100] border-b border-line">
+        <div class="max-w-page mx-auto px-6">
+            <nav class="flex justify-between items-center h-[70px]">
+                <a href="../index.html" class="font-bold text-xl tracking-[-0.5px]">조용현 | I AM</a>
+                <div class="hidden md:flex gap-8">
+                    <a href="../index.html" class="text-[15px] font-medium text-sub transition duration-300 motion-reduce:transition-none hover:text-primary">← 전체 사례</a>
+                    <a href="#problem" class="text-[15px] font-medium text-sub transition duration-300 motion-reduce:transition-none hover:text-primary">문제</a>
+                    <a href="#solution" class="text-[15px] font-medium text-sub transition duration-300 motion-reduce:transition-none hover:text-primary">해결</a>
+                    <a href="#result" class="text-[15px] font-medium text-sub transition duration-300 motion-reduce:transition-none hover:text-primary">결과</a>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <!-- 1. 히어로 -->
+        <section class="pt-[160px] pb-[80px]">
+            <div class="max-w-page mx-auto px-6">
+                <div data-fade class="opacity-0 translate-y-[30px] transition-[opacity,transform] duration-[800ms] ease-out motion-reduce:transition-none text-center">
+                    <span class="inline-block px-3.5 py-1.5 bg-primary-light text-primary rounded-[20px] text-sm font-semibold mb-6">문제 해결 사례 · Popping Community</span>
+                    <h1 class="text-[38px] md:text-[56px] font-extrabold leading-[1.2] tracking-[-1px] mb-6">애플리케이션 <span class="bg-gradient-to-br from-primary to-[#8A8DFF] bg-clip-text text-transparent">Scale Out</span></h1>
+                    <p class="text-xl text-sub max-w-[760px] mx-auto mb-12 break-keep">
+                        500 VUser 부하에서 App CPU가 200%(2코어 상한)로 포화되어 요청이 대기열에 쌓였습니다.<br>
+                        HAProxy 로드밸런서와 App 2대 수평 확장으로 병목을 해소했습니다.
+                    </p>
+                </div>
+
+                <div data-fade class="opacity-0 translate-y-[30px] transition-[opacity,transform] duration-[800ms] ease-out motion-reduce:transition-none grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 text-left">
+                    <div class="bg-card border border-line rounded-3xl px-6 py-8 shadow-soft">
+                        <div class="text-sm text-sub mb-2 font-semibold">TPS</div>
+                        <div class="text-2xl font-bold flex items-baseline gap-2 flex-wrap font-mono">
+                            <span class="text-sub line-through text-lg opacity-70">274/s</span>
+                            <span class="text-line text-base">→</span>
+                            <span class="text-primary text-[32px] tracking-[-1px]">527/s</span>
+                        </div>
+                        <div class="text-[13px] text-sub mt-3 pt-3 border-t border-line">처리량 +92.3% (이론상 2배 대비 96%)</div>
+                    </div>
+                    <div class="bg-card border border-line rounded-3xl px-6 py-8 shadow-soft">
+                        <div class="text-sm text-sub mb-2 font-semibold">평균 응답시간</div>
+                        <div class="text-2xl font-bold flex items-baseline gap-2 flex-wrap font-mono">
+                            <span class="text-sub line-through text-lg opacity-70">867ms</span>
+                            <span class="text-line text-base">→</span>
+                            <span class="text-primary text-[32px] tracking-[-1px]">32ms</span>
+                        </div>
+                        <div class="text-[13px] text-sub mt-3 pt-3 border-t border-line">CPU 포화 해소로 큐잉 지연 제거 (-96.3%)</div>
+                    </div>
+                    <div class="bg-card border border-line rounded-3xl px-6 py-8 shadow-soft">
+                        <div class="text-sm text-sub mb-2 font-semibold">P99 응답시간</div>
+                        <div class="text-2xl font-bold flex items-baseline gap-2 flex-wrap font-mono">
+                            <span class="text-sub line-through text-lg opacity-70">7,511ms</span>
+                            <span class="text-line text-base">→</span>
+                            <span class="text-primary text-[32px] tracking-[-1px]">201ms</span>
+                        </div>
+                        <div class="text-[13px] text-sub mt-3 pt-3 border-t border-line">Tail Latency -97.3%</div>
+                    </div>
+                    <div class="bg-card border border-line rounded-3xl px-6 py-8 shadow-soft">
+                        <div class="text-sm text-sub mb-2 font-semibold">에러율</div>
+                        <div class="text-2xl font-bold flex items-baseline gap-2 flex-wrap font-mono">
+                            <span class="text-primary text-[32px] tracking-[-1px]">0%</span>
+                        </div>
+                        <div class="text-[13px] text-sub mt-3 pt-3 border-t border-line">총 요청 164,601 → 316,041건, 에러 없음</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. 문제 상황 -->
+        <section id="problem" class="max-w-page mx-auto px-6 pb-[80px]">
+            <div data-fade class="opacity-0 translate-y-[30px] transition-[opacity,transform] duration-[800ms] ease-out motion-reduce:transition-none bg-card border border-line rounded-3xl px-5 py-8 md:p-[60px] shadow-soft">
+                <span class="inline-block px-3.5 py-1.5 bg-primary-light text-primary rounded-[20px] text-sm font-semibold mb-6">STEP 1 · 문제 상황</span>
+                <h2 class="text-[28px] md:text-[36px] font-bold mb-6 leading-[1.3]">코드 최적화 이후에도 App CPU는 포화 상태였습니다</h2>
+                <p class="text-base text-sub break-keep mb-8">
+                    댓글 트리 조회 최적화로 응답시간을 28% 개선했지만, 500 VUser 부하테스트에서 App CPU는 여전히 200%(2코어 상한)에 도달했습니다.
+                    CPU가 포화되면서 요청이 처리 대기 상태에 놓였고, P99 응답시간이 10초 가까이 치솟았습니다.
+                    코드 최적화만으로는 한계가 있다고 판단해, App 인스턴스를 추가하는 수평 확장을 선택했습니다.
+                </p>
+
+                <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>Scale Up vs Scale Out</h3>
+                <div class="overflow-x-auto mb-8">
+                    <table class="w-full text-left border-collapse min-w-[560px]">
+                        <thead>
+                            <tr class="bg-page">
+                                <th class="p-3 border border-line text-sm font-semibold">전략</th>
+                                <th class="p-3 border border-line text-sm font-semibold">장점</th>
+                                <th class="p-3 border border-line text-sm font-semibold">단점</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-sm text-sub">
+                            <tr>
+                                <td class="p-3 border border-line font-medium text-main">Scale Up (CPU 증가)</td>
+                                <td class="p-3 border border-line">구성 변경 없음, 즉시 효과</td>
+                                <td class="p-3 border border-line">단일 장애점, 비용 급증, 한계 존재</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 border border-line font-medium text-primary">Scale Out (인스턴스 추가) ✓</td>
+                                <td class="p-3 border border-line">선형 확장, 고가용성 확보</td>
+                                <td class="p-3 border border-line">LB 필요, 세션/캐시 공유 문제</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>아키텍처 변경</h3>
+                <pre class="bg-main text-[#E5E7EB] rounded-xl p-5 text-sm font-mono overflow-x-auto leading-relaxed mb-2">Before: Client → App (2cpu/2GB) → MySQL (1cpu/1GB)
+
+After:  Client → HAProxy (LB) ─┬─ App-1 (2cpu/2GB) ─┬─ MySQL (1cpu/1GB)
+                               └─ App-2 (2cpu/2GB) ─┘</pre>
+            </div>
+        </section>
+
+        <!-- 3. 해결 방법 -->
+        <section id="solution" class="max-w-page mx-auto px-6 pb-[80px]">
+            <div data-fade class="opacity-0 translate-y-[30px] transition-[opacity,transform] duration-[800ms] ease-out motion-reduce:transition-none bg-card border border-line rounded-3xl px-5 py-8 md:p-[60px] shadow-soft">
+                <span class="inline-block px-3.5 py-1.5 bg-primary-light text-primary rounded-[20px] text-sm font-semibold mb-6">STEP 2 · 해결 방법</span>
+                <h2 class="text-[28px] md:text-[36px] font-bold mb-6 leading-[1.3]">왜 HAProxy인가 — Sticky Session이 핵심 요구사항</h2>
+                <p class="text-base text-sub break-keep mb-8">
+                    세션 기반 인증을 사용하므로 같은 사용자의 요청이 항상 같은 인스턴스로 가야 세션이 유지됩니다.
+                    로드밸런서 후보를 Sticky Session 지원 방식으로 비교했습니다.
+                </p>
+
+                <div class="overflow-x-auto mb-10">
+                    <table class="w-full text-left border-collapse min-w-[560px]">
+                        <thead>
+                            <tr class="bg-page">
+                                <th class="p-3 border border-line text-sm font-semibold">로드밸런서</th>
+                                <th class="p-3 border border-line text-sm font-semibold">Sticky Session (오픈소스)</th>
+                                <th class="p-3 border border-line text-sm font-semibold">비고</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-sm text-sub">
+                            <tr>
+                                <td class="p-3 border border-line font-medium text-main">Nginx (ip_hash)</td>
+                                <td class="p-3 border border-line">같은 IP만 가능</td>
+                                <td class="p-3 border border-line">JMeter 500 스레드가 전부 같은 IP → 한쪽 쏠림</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 border border-line font-medium text-main">Nginx (hash $cookie)</td>
+                                <td class="p-3 border border-line">첫 요청 시 쿠키 없음 → 쏠림</td>
+                                <td class="p-3 border border-line">첫 요청 분산 불가</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 border border-line font-medium text-primary">HAProxy (cookie insert) ✓</td>
+                                <td class="p-3 border border-line font-semibold text-main">첫 요청부터 균등 분산</td>
+                                <td class="p-3 border border-line">추가 모듈 불필요</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10 mb-10">
+                    <div>
+                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>cookie insert 동작 방식</h3>
+                        <ol class="text-base text-sub break-keep pl-5 list-decimal mb-6">
+                            <li class="mb-2">첫 요청: 쿠키 없음 → round-robin 분산 → 응답에 <code class="font-mono text-[14px] bg-page px-1.5 py-0.5 rounded text-primary">SERVERID=app1</code> 쿠키 자동 삽입</li>
+                            <li class="mb-2">이후 요청: 쿠키 기반으로 동일 인스턴스 고정</li>
+                        </ol>
+                        <pre class="bg-main text-[#E5E7EB] rounded-xl p-5 text-sm font-mono overflow-x-auto leading-relaxed">frontend http_front
+    bind *:9091
+    default_backend app_servers
+
+backend app_servers
+    balance roundrobin
+    cookie SERVERID insert indirect nocache
+    server app1 popping-app-1:9091 check cookie app1
+    server app2 popping-app-2:9091 check cookie app2</pre>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>Redis 없이 가능한 이유</h3>
+                        <p class="text-base text-sub break-keep mb-4">
+                            Scale Out에는 일반적으로 세션/캐시 공유를 위한 Redis가 필요하다고 알려져 있지만, Sticky Session을 사용하면 이번 단계에서는 불필요했습니다.
+                        </p>
+                        <div class="bg-page rounded-2xl p-6">
+                            <div class="grid gap-3">
+                                <div class="flex justify-between items-center pb-3 border-b border-dashed border-line">
+                                    <span class="font-medium">세션</span>
+                                    <span class="text-sm text-sub">같은 사용자 → 같은 인스턴스 → <strong class="text-primary">유지됨</strong></span>
+                                </div>
+                                <div class="flex justify-between items-center pb-3 border-b border-dashed border-line">
+                                    <span class="font-medium">Caffeine 캐시</span>
+                                    <span class="text-sm text-sub">인스턴스별 독립 캐시 <strong class="text-primary">(히트율은 절반)</strong></span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="font-medium">WebSocket</span>
+                                    <span class="text-sm text-sub">부하테스트 범위에 <strong class="text-primary">미포함</strong></span>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="text-[13px] text-sub mt-4 break-keep">
+                            * Sticky Session의 한계: 인스턴스 장애 시 해당 인스턴스에 붙어있던 사용자의 세션이 유실됩니다. 고가용성이 필요해지면 Redis Session 도입이 다음 단계입니다.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap gap-2">
+                    <span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">HAProxy</span>
+                    <span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">Docker Compose</span>
+                    <span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">Spring Boot</span>
+                    <span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">JMeter</span>
+                    <span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">Grafana</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. 결과 -->
+        <section id="result" class="max-w-page mx-auto px-6 pb-[80px]">
+            <div data-fade class="opacity-0 translate-y-[30px] transition-[opacity,transform] duration-[800ms] ease-out motion-reduce:transition-none bg-card border border-line rounded-3xl px-5 py-8 md:p-[60px] shadow-soft">
+                <span class="inline-block px-3.5 py-1.5 bg-primary-light text-primary rounded-[20px] text-sm font-semibold mb-6">STEP 3 · 검증 결과</span>
+                <h2 class="text-[28px] md:text-[36px] font-bold mb-6 leading-[1.3]">동일 조건 부하테스트로 개선을 검증했습니다</h2>
+                <p class="text-base text-sub break-keep mb-8">
+                    댓글 505만 건, 좋아요 735만 건 데이터에서 500 VUser로 10분간 동일한 시나리오를 실행했습니다.
+                </p>
+
+                <div class="overflow-x-auto mb-12">
+                    <table class="w-full text-left border-collapse min-w-[560px]">
+                        <thead>
+                            <tr class="bg-page">
+                                <th class="p-3 border border-line text-sm font-semibold">지표</th>
+                                <th class="p-3 border border-line text-sm font-semibold">Before (App 1대)</th>
+                                <th class="p-3 border border-line text-sm font-semibold">After (App 2대)</th>
+                                <th class="p-3 border border-line text-sm font-semibold">변화</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-sm font-mono">
+                            <tr>
+                                <td class="p-3 border border-line font-sans font-medium">TPS</td>
+                                <td class="p-3 border border-line text-sub">274/s</td>
+                                <td class="p-3 border border-line font-bold text-primary">527/s</td>
+                                <td class="p-3 border border-line text-secondary font-bold">+92.3%</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 border border-line font-sans font-medium">평균 응답시간</td>
+                                <td class="p-3 border border-line text-sub">867ms</td>
+                                <td class="p-3 border border-line font-bold text-primary">32ms</td>
+                                <td class="p-3 border border-line text-secondary font-bold">-96.3%</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 border border-line font-sans font-medium">P95 응답시간</td>
+                                <td class="p-3 border border-line text-sub">4,799ms</td>
+                                <td class="p-3 border border-line font-bold text-primary">93ms</td>
+                                <td class="p-3 border border-line text-secondary font-bold">-98.1%</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 border border-line font-sans font-medium">P99 응답시간</td>
+                                <td class="p-3 border border-line text-sub">7,511ms</td>
+                                <td class="p-3 border border-line font-bold text-primary">201ms</td>
+                                <td class="p-3 border border-line text-secondary font-bold">-97.3%</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 border border-line font-sans font-medium">총 요청 수</td>
+                                <td class="p-3 border border-line text-sub">164,601</td>
+                                <td class="p-3 border border-line font-bold text-primary">316,041</td>
+                                <td class="p-3 border border-line text-secondary font-bold">+92.0%</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 border border-line font-sans font-medium">에러율</td>
+                                <td class="p-3 border border-line text-sub">0%</td>
+                                <td class="p-3 border border-line font-bold text-primary">0%</td>
+                                <td class="p-3 border border-line text-sub">동일</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 class="text-xl font-bold mb-6 text-center">CPU 사용률 변화</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+                    <div class="relative border border-line rounded-xl overflow-hidden bg-[#FAFAFA]">
+                        <span class="absolute top-4 left-4 px-3 py-1.5 rounded-lg font-bold text-sm z-10 backdrop-blur-sm bg-white/90 text-main border border-line">BEFORE</span>
+                        <div class="w-full aspect-video bg-[#F1F3F5] flex items-center justify-center relative">
+                            <img src="../images/scaleout-cpu-before.png" alt="Scale Out 전 애플리케이션 CPU 200% 포화 상태 그래프" data-zoom class="w-full h-auto aspect-video object-contain block cursor-zoom-in transition-transform duration-300 motion-reduce:transition-none hover:scale-[1.02]" onerror="this.style.display='none'">
+                        </div>
+                        <p class="p-4 bg-white border-t border-line text-[15px] text-sub leading-normal break-keep">App 1대가 약 200%로 CPU 상한(2코어)에 도달했다. MySQL은 50~60% 수준.</p>
+                    </div>
+                    <div class="relative border border-line rounded-xl overflow-hidden bg-[#FAFAFA]">
+                        <span class="absolute top-4 left-4 px-3 py-1.5 rounded-lg font-bold text-sm z-10 backdrop-blur-sm bg-primary text-white">AFTER</span>
+                        <div class="w-full aspect-video bg-[#F1F3F5] flex items-center justify-center relative">
+                            <img src="../images/scaleout-cpu-after.png" alt="Scale Out 후 애플리케이션 CPU 포화 해소 그래프" data-zoom class="w-full h-auto aspect-video object-contain block cursor-zoom-in transition-transform duration-300 motion-reduce:transition-none hover:scale-[1.02]" onerror="this.style.display='none'">
+                        </div>
+                        <p class="p-4 bg-white border-t border-line text-[15px] text-sub leading-normal break-keep">App-1, App-2가 각각 120~150%로 여유가 생겼다. 대신 MySQL이 100%에 도달 — 병목이 이동했다.</p>
+                    </div>
+                </div>
+
+                <h3 class="text-xl font-bold mb-6 text-center mt-14">응답시간 변화</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+                    <div class="relative border border-line rounded-xl overflow-hidden bg-[#FAFAFA]">
+                        <span class="absolute top-4 left-4 px-3 py-1.5 rounded-lg font-bold text-sm z-10 backdrop-blur-sm bg-white/90 text-main border border-line">BEFORE</span>
+                        <div class="w-full aspect-video bg-[#F1F3F5] flex items-center justify-center relative">
+                            <img src="../images/scaleout-response-before.png" alt="Scale Out 전 높은 응답시간 지연 그래프" data-zoom class="w-full h-auto aspect-video object-contain block cursor-zoom-in transition-transform duration-300 motion-reduce:transition-none hover:scale-[1.02]" loading="lazy" onerror="this.style.display='none'">
+                        </div>
+                        <p class="p-4 bg-white border-t border-line text-[15px] text-sub leading-normal break-keep">P99 약 10초, P95 5초대. App CPU 포화로 요청이 큐에 대기하며 응답시간이 급증한다.</p>
+                    </div>
+                    <div class="relative border border-line rounded-xl overflow-hidden bg-[#FAFAFA]">
+                        <span class="absolute top-4 left-4 px-3 py-1.5 rounded-lg font-bold text-sm z-10 backdrop-blur-sm bg-primary text-white">AFTER</span>
+                        <div class="w-full aspect-video bg-[#F1F3F5] flex items-center justify-center relative">
+                            <img src="../images/scaleout-response-after.png" alt="Scale Out 후 응답시간 안정화 그래프" data-zoom class="w-full h-auto aspect-video object-contain block cursor-zoom-in transition-transform duration-300 motion-reduce:transition-none hover:scale-[1.02]" loading="lazy" onerror="this.style.display='none'">
+                        </div>
+                        <p class="p-4 bg-white border-t border-line text-[15px] text-sub leading-normal break-keep">P99 100~350ms, P95 50~100ms로 대폭 개선. App-1과 App-2가 균등하게 부하를 분담한다.</p>
+                    </div>
+                </div>
+
+                <div class="border-t border-line pt-10">
+                    <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>분석 — 병목의 이동</h3>
+                    <p class="text-base text-sub break-keep mb-4">
+                        Before에서 App CPU가 포화 상태였기 때문에, App을 추가하자 처리량이 선형에 가깝게 증가했습니다 (1.92배, 이론상 2배 대비 96%).
+                        평균 응답시간이 96% 감소한 핵심은 <strong class="text-main">CPU 포화 해소로 큐잉 지연이 사라진 것</strong>입니다.
+                    </p>
+                    <p class="text-primary font-semibold break-keep">
+                        "Scale Out 후 병목은 사라진 것이 아니라 MySQL로 이동했습니다. MySQL이 1cpu 100%에 도달해, App을 더 추가해도 TPS 향상은 제한적입니다."
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. CTA -->
+        <section class="max-w-page mx-auto px-6">
+            <div data-fade class="opacity-0 translate-y-[30px] transition-[opacity,transform] duration-[800ms] ease-out motion-reduce:transition-none text-center bg-primary-light rounded-3xl px-6 py-16 mb-[80px]">
+                <h2 class="text-3xl font-bold mb-4 text-primary">병목이 MySQL로 이동했다면?</h2>
+                <p class="text-lg max-w-[800px] mx-auto text-main break-keep">
+                    다음 사례에서 MySQL Read Replica 도입으로 이동한 병목을 해소한 과정을 확인할 수 있습니다.
+                </p>
+                <div class="flex flex-col md:flex-row flex-wrap gap-4 justify-center mt-8">
+                    <a href="./read-replica.html" class="inline-flex items-center justify-center px-7 py-3.5 rounded-xl font-semibold text-base min-h-[48px] w-full md:w-auto transition duration-300 motion-reduce:transition-none bg-primary text-white hover:bg-primary-dark hover:-translate-y-0.5">다음 사례: MySQL Read Replica →</a>
+                    <a href="https://velog.io/@chooh1010/MySQL-Read-Replica-도입과-부하테스트-77vr9rfz" target="_blank" class="inline-flex items-center justify-center px-7 py-3.5 rounded-xl font-semibold text-base min-h-[48px] w-full md:w-auto transition duration-300 motion-reduce:transition-none bg-secondary text-white hover:-translate-y-0.5">Velog 전체 분석 글 보기</a>
+                    <a href="../index.html" class="inline-flex items-center justify-center px-7 py-3.5 rounded-xl font-semibold text-base min-h-[48px] w-full md:w-auto transition duration-300 motion-reduce:transition-none bg-transparent text-main border border-line hover:bg-card hover:border-main">← 전체 사례 보기</a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 푸터 -->
+    <footer class="border-t border-line py-[60px] text-center">
+        <div class="max-w-page mx-auto px-6 flex flex-col items-center gap-6">
+            <div class="flex flex-wrap justify-center gap-6">
+                <span class="font-bold text-main">조용현 | Backend Engineer</span>
+                <a href="../index.html" class="text-sub font-medium hover:text-primary">홈</a>
+                <a href="https://github.com/chooh1010" target="_blank" class="text-sub font-medium hover:text-primary">GitHub</a>
+                <a href="https://velog.io/@chooh1010" target="_blank" class="text-sub font-medium hover:text-primary">Velog</a>
+                <a href="mailto:chooh1010@gmail.com" class="text-sub font-medium hover:text-primary">Email</a>
+            </div>
+            <p class="text-sm text-sub">
+                Built with HTML, Tailwind CSS and Vanilla JavaScript.<br>
+                Measured, tested and improved by Cho Yonghyeon.
+            </p>
+        </div>
+    </footer>
+
+    <!-- 이미지 확대 모달 -->
+    <div id="imageModal" class="fixed inset-0 w-full h-full bg-[rgba(17,24,39,0.9)] z-[9999] flex items-center justify-center opacity-0 invisible transition-all duration-300 motion-reduce:transition-none">
+        <div class="relative max-w-[90vw] max-h-[90vh]">
+            <button id="closeModal" class="absolute -top-10 right-0 bg-transparent border-none text-white text-[32px] cursor-pointer">×</button>
+            <img src="" alt="확대된 이미지" class="max-w-full max-h-[90vh] rounded-lg object-contain" id="modalImage">
+        </div>
+    </div>
+
+    <!-- 기능 스크립트 -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // 1. 부드러운 스크롤 (헤더 메뉴 클릭 시)
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    const targetId = this.getAttribute('href');
+                    if (targetId === '#') return;
+
+                    const targetElement = document.querySelector(targetId);
+                    if (targetElement) {
+                        e.preventDefault();
+                        const offsetTop = targetElement.getBoundingClientRect().top + window.scrollY - 80;
+                        window.scrollTo({ top: offsetTop, behavior: 'smooth' });
+                    }
+                });
+            });
+
+            // 2. Intersection Observer를 활용한 스크롤 애니메이션
+            const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            const HIDDEN_CLASSES = ['opacity-0', 'translate-y-[30px]'];
+            const revealElement = (el) => el.classList.remove(...HIDDEN_CLASSES);
+
+            const fadeUpObserver = new IntersectionObserver((entries, observer) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        revealElement(entry.target);
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, { root: null, threshold: 0.1, rootMargin: "0px 0px -50px 0px" });
+
+            document.querySelectorAll('[data-fade]').forEach(el => {
+                if (prefersReducedMotion) {
+                    revealElement(el);
+                } else {
+                    fadeUpObserver.observe(el);
+                }
+            });
+
+            // 3. 이미지 모달 기능
+            const modal = document.getElementById('imageModal');
+            const modalImg = document.getElementById('modalImage');
+            const closeModalBtn = document.getElementById('closeModal');
+            const MODAL_HIDDEN_CLASSES = ['opacity-0', 'invisible'];
+
+            document.querySelectorAll('[data-zoom]').forEach(img => {
+                img.addEventListener('click', (e) => {
+                    if (e.target.style.display === 'none' || !e.target.getAttribute('src')) return;
+                    modalImg.src = e.target.src;
+                    modalImg.alt = e.target.alt;
+                    modal.classList.remove(...MODAL_HIDDEN_CLASSES);
+                    document.body.style.overflow = 'hidden';
+                });
+            });
+
+            const closeModal = () => {
+                modal.classList.add(...MODAL_HIDDEN_CLASSES);
+                document.body.style.overflow = '';
+                setTimeout(() => { modalImg.src = ''; }, 300);
+            };
+
+            closeModalBtn.addEventListener('click', closeModal);
+            modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && !modal.classList.contains('opacity-0')) closeModal();
+            });
+        });
+    </script>
+</body>
+</html>
