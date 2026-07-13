@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>조용현 | Backend Engineer Portfolio</title>
-    <meta name="description" content="병목을 따라 시스템을 확장한 과정을 기록한 백엔드 포트폴리오. Scale Out으로 TPS 92% 향상, Read Replica로 응답시간 67% 개선을 부하테스트로 검증했습니다.">
+    <meta name="description" content="부하테스트와 운영 지표로 병목을 재현하고 검증한 백엔드 포트폴리오. Scale Out, Read Replica, 캐싱, 동시성, 쿼리 최적화, CI/CD까지 6개 문제 해결 사례를 소개합니다.">
 
     <!-- Open Graph -->
     <meta property="og:type" content="website">
     <meta property="og:title" content="조용현 | Backend Engineer Portfolio">
-    <meta property="og:description" content="Scale Out으로 TPS 92% 향상, Read Replica로 응답시간 67% 개선. 문제를 재현하고 결과를 검증하는 백엔드 개발자입니다.">
+    <meta property="og:description" content="Scale Out부터 캐싱·동시성·쿼리 최적화·CI/CD까지, 문제를 재현하고 결과로 검증한 6개 백엔드 사례입니다.">
     <meta property="og:url" content="https://chooh1010.github.io/resume/">
     <meta property="og:image" content="https://chooh1010.github.io/resume/images/architecture-v2.png">
     <meta name="twitter:card" content="summary_large_image">
@@ -66,9 +66,8 @@
                 <div class="font-bold text-xl tracking-[-0.5px]">조용현 | I AM</div>
                 <div class="hidden md:flex gap-8">
                     <a href="#about" class="text-[15px] font-medium text-sub transition duration-300 motion-reduce:transition-none hover:text-primary">소개</a>
-                    <a href="#scale-out" class="text-[15px] font-medium text-sub transition duration-300 motion-reduce:transition-none hover:text-primary">Scale Out</a>
-                    <a href="#read-replica" class="text-[15px] font-medium text-sub transition duration-300 motion-reduce:transition-none hover:text-primary">Read Replica</a>
-                    <a href="#cta" class="text-[15px] font-medium text-sub transition duration-300 motion-reduce:transition-none hover:text-primary">전체 분석 과정</a>
+                    <a href="#cases" class="text-[15px] font-medium text-sub transition duration-300 motion-reduce:transition-none hover:text-primary">문제 해결 사례</a>
+                    <a href="#cta" class="text-[15px] font-medium text-sub transition duration-300 motion-reduce:transition-none hover:text-primary">더 알아보기</a>
                 </div>
             </nav>
         </div>
@@ -86,7 +85,7 @@
                         Scale Out으로 처리량을 높인 뒤, MySQL로 이동한 병목을 Read Replica로 다시 개선했습니다.
                     </p>
                     <div class="flex gap-4 justify-center mb-20">
-                        <a href="#scale-out" class="inline-flex items-center justify-center px-7 py-3.5 rounded-xl font-semibold text-base min-h-[48px] w-full md:w-auto transition duration-300 motion-reduce:transition-none bg-primary text-white hover:bg-primary-dark hover:-translate-y-0.5">성능 개선 과정 보기</a>
+                        <a href="#cases" class="inline-flex items-center justify-center px-7 py-3.5 rounded-xl font-semibold text-base min-h-[48px] w-full md:w-auto transition duration-300 motion-reduce:transition-none bg-primary text-white hover:bg-primary-dark hover:-translate-y-0.5">문제 해결 사례 보기</a>
                         <a href="https://github.com/chooh1010" target="_blank" class="inline-flex items-center justify-center px-7 py-3.5 rounded-xl font-semibold text-base min-h-[48px] w-full md:w-auto transition duration-300 motion-reduce:transition-none bg-transparent text-main border border-line hover:bg-card hover:border-main">GitHub 방문</a>
                     </div>
                 </div>
@@ -282,260 +281,121 @@
             </div>
         </section>
 
-        <!-- 3. 강점 카드 1: Scale Out -->
-        <section id="scale-out" class="max-w-page mx-auto px-6 pt-[110px]">
-            <div data-fade class="opacity-0 translate-y-[30px] transition-[opacity,transform] duration-[800ms] ease-out motion-reduce:transition-none bg-card border border-line rounded-3xl px-5 py-8 md:p-[60px] shadow-soft mb-10">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10 mb-12">
-                    <div>
-                        <span class="inline-block px-3.5 py-1.5 bg-primary-light text-primary rounded-[20px] text-sm font-semibold mb-6">문제 해결 사례 1</span>
-                        <h3 class="text-[32px] font-bold mb-6">애플리케이션 Scale Out</h3>
+        <!-- 3. 문제 해결 사례 허브 -->
+        <section id="cases" class="max-w-page mx-auto px-6 pt-[110px]">
+            <div data-fade class="opacity-0 translate-y-[30px] transition-[opacity,transform] duration-[800ms] ease-out motion-reduce:transition-none mb-14 text-center">
+                <span class="inline-block px-3.5 py-1.5 bg-primary-light text-primary rounded-[20px] text-sm font-semibold mb-6">Popping · 6 Case Studies</span>
+                <h2 class="text-[32px] md:text-[42px] font-bold mb-4 leading-[1.3]">병목의 원인부터 검증 결과까지<br>각 사례에 따로 담았습니다.</h2>
+                <p class="text-lg text-sub max-w-[760px] mx-auto break-keep">문제 상황, 선택한 해결책, 구현 과정, 부하테스트 결과와 트레이드오프를 독립된 페이지에서 확인할 수 있습니다.</p>
+            </div>
 
-                        <div class="mb-6">
-                            <h4 class="text-base font-bold text-main mb-2 flex items-center gap-2"><span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>문제 상황</h4>
-                            <p class="text-base text-sub break-keep">500명의 가상 사용자가 요청하는 환경에서 애플리케이션 서버 CPU가 약 200%에 도달했습니다. CPU가 포화되면서 요청이 처리 대기 상태에 놓였고, 응답시간이 크게 증가했습니다.</p>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-[110px]">
+                <a href="./cases/comment-cache.html" data-fade class="group opacity-0 translate-y-[30px] transition-[opacity,transform,box-shadow,border-color] duration-[800ms] ease-out motion-reduce:transition-none bg-card border border-line rounded-3xl p-6 md:p-9 shadow-soft hover:-translate-y-1 hover:shadow-soft-hover hover:border-primary-light">
+                    <div class="flex items-start justify-between gap-5 mb-7">
+                        <div>
+                            <span class="inline-block px-3 py-1 bg-primary-light text-primary rounded-full text-[13px] font-semibold mb-4">01 · Cache</span>
+                            <h3 class="text-[26px] font-bold leading-tight">댓글 첫 페이지 캐싱</h3>
                         </div>
-
-                        <div class="mb-6">
-                            <h4 class="text-base font-bold text-main mb-2 flex items-center gap-2"><span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>해결 방법</h4>
-                            <p class="text-base text-sub break-keep">HAProxy를 로드밸런서로 사용하고 애플리케이션 서버를 1대에서 2대로 확장했습니다. 요청을 두 개의 애플리케이션 인스턴스로 분산하여 단일 서버의 CPU 포화를 해소했습니다.</p>
-                        </div>
-
-                        <div class="mb-6">
-                            <p class="text-primary font-semibold break-keep">
-                                "애플리케이션 서버를 확장해 처리량을 높였지만, 병목은 사라진 것이 아니라 MySQL로 이동했습니다."
-                            </p>
-                        </div>
-
-                        <div class="flex flex-wrap gap-2 mt-6">
-                            <span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">HAProxy</span>
-                            <span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">Docker</span>
-                            <span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">Spring Boot</span>
-                            <span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">JMeter</span>
-                            <span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">Grafana</span>
-                        </div>
+                        <span class="text-2xl text-primary transition-transform duration-300 motion-reduce:transition-none group-hover:translate-x-1" aria-hidden="true">→</span>
                     </div>
-
-                    <div class="bg-page rounded-2xl p-6">
-                        <h4 class="font-bold text-base mb-4">개선 결과 (Scale Out)</h4>
-                        <div class="grid gap-3 font-mono">
-                            <div class="flex justify-between items-center pb-3 border-b border-dashed border-line">
-                                <span class="font-medium">TPS</span>
-                                <span>274/s <span class="text-sub">→</span> <strong class="text-primary">527/s</strong></span>
-                            </div>
-                            <div class="flex justify-between items-center pb-3 border-b border-dashed border-line">
-                                <span class="font-medium">평균 응답시간</span>
-                                <span>867ms <span class="text-sub">→</span> <strong class="text-primary">32ms</strong></span>
-                            </div>
-                            <div class="flex justify-between items-center pb-3 border-b border-dashed border-line">
-                                <span class="font-medium">P95 응답시간</span>
-                                <span>4,799ms <span class="text-sub">→</span> <strong class="text-primary">93ms</strong></span>
-                            </div>
-                            <div class="flex justify-between items-center pb-3 border-b border-dashed border-line">
-                                <span class="font-medium">P99 응답시간</span>
-                                <span>7,511ms <span class="text-sub">→</span> <strong class="text-primary">201ms</strong></span>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="font-medium">에러율</span>
-                                <span><strong class="text-primary">0% 유지</strong></span>
-                            </div>
-                        </div>
+                    <p class="text-sub mb-7 break-keep">반복 생성되던 댓글 트리를 Cache-Aside로 줄이고, evict 직후 캐시 스탬피드는 per-key 원자적 로딩으로 막았습니다.</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6 font-mono">
+                        <div class="bg-page rounded-xl p-4"><span class="block text-xs text-sub mb-1 font-sans">Hot 응답</span><strong class="text-xl text-primary">152 → 43ms</strong></div>
+                        <div class="bg-page rounded-xl p-4"><span class="block text-xs text-sub mb-1 font-sans">CTE 실행</span><strong class="text-xl text-primary">-93%</strong></div>
                     </div>
-                </div>
+                    <div class="flex flex-wrap gap-2"><span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">Caffeine</span><span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">Cache-Aside</span><span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">Recursive CTE</span></div>
+                </a>
 
-                <div class="border-t border-line pt-12">
-                    <h4 class="text-xl font-bold mb-6 text-center">CPU 사용률 변화</h4>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-                        <div class="relative border border-line rounded-xl overflow-hidden bg-[#FAFAFA]">
-                            <span class="absolute top-4 left-4 px-3 py-1.5 rounded-lg font-bold text-sm z-10 backdrop-blur-sm bg-white/90 text-main border border-line">BEFORE</span>
-                            <div class="w-full aspect-video bg-[#F1F3F5] flex items-center justify-center relative">
-                                <img src="./images/scaleout-cpu-before.png" alt="Scale Out 전 애플리케이션 CPU 200% 포화 상태 그래프" data-zoom class="w-full h-auto aspect-video object-contain block cursor-zoom-in transition-transform duration-300 motion-reduce:transition-none hover:scale-[1.02]" onerror="this.style.display='none'">
-                            </div>
-                            <p class="p-4 bg-white border-t border-line text-[15px] text-sub leading-normal break-keep">애플리케이션 1대의 CPU가 약 200%에 도달하면서 요청이 처리 대기 상태에 놓였다.</p>
+                <a href="./cases/like-concurrency.html" data-fade class="group opacity-0 translate-y-[30px] transition-[opacity,transform,box-shadow,border-color] duration-[800ms] ease-out motion-reduce:transition-none bg-card border border-line rounded-3xl p-6 md:p-9 shadow-soft hover:-translate-y-1 hover:shadow-soft-hover hover:border-primary-light">
+                    <div class="flex items-start justify-between gap-5 mb-7">
+                        <div>
+                            <span class="inline-block px-3 py-1 bg-primary-light text-primary rounded-full text-[13px] font-semibold mb-4">02 · Concurrency</span>
+                            <h3 class="text-[26px] font-bold leading-tight">좋아요 중복 Insert 경쟁</h3>
                         </div>
-                        <div class="relative border border-line rounded-xl overflow-hidden bg-[#FAFAFA]">
-                            <span class="absolute top-4 left-4 px-3 py-1.5 rounded-lg font-bold text-sm z-10 backdrop-blur-sm bg-primary text-white">AFTER</span>
-                            <div class="w-full aspect-video bg-[#F1F3F5] flex items-center justify-center relative">
-                                <img src="./images/scaleout-cpu-after.png" alt="Scale Out 후 애플리케이션 CPU 포화 해소 그래프" data-zoom class="w-full h-auto aspect-video object-contain block cursor-zoom-in transition-transform duration-300 motion-reduce:transition-none hover:scale-[1.02]" onerror="this.style.display='none'">
-                            </div>
-                            <p class="p-4 bg-white border-t border-line text-[15px] text-sub leading-normal break-keep">애플리케이션을 2대로 확장한 뒤 각 인스턴스가 요청을 분담하면서 CPU 포화가 해소되었다.</p>
-                        </div>
+                        <span class="text-2xl text-primary transition-transform duration-300 motion-reduce:transition-none group-hover:translate-x-1" aria-hidden="true">→</span>
                     </div>
+                    <p class="text-sub mb-7 break-keep">check-then-act 경쟁을 DB 원자 연산으로 바꾸고 MySQL 드라이버의 영향 행 수 동작까지 검증해 요청을 멱등하게 만들었습니다.</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6 font-mono">
+                        <div class="bg-page rounded-xl p-4"><span class="block text-xs text-sub mb-1 font-sans">동시 20요청 예외</span><strong class="text-xl text-primary">17 → 0건</strong></div>
+                        <div class="bg-page rounded-xl p-4"><span class="block text-xs text-sub mb-1 font-sans">Count 반영</span><strong class="text-xl text-primary">정확히 1회</strong></div>
+                    </div>
+                    <div class="flex flex-wrap gap-2"><span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">MySQL</span><span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">Idempotency</span><span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">JMeter</span></div>
+                </a>
 
-                    <h4 class="text-xl font-bold mb-6 text-center mt-14">응답시간 변화</h4>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-                        <div class="relative border border-line rounded-xl overflow-hidden bg-[#FAFAFA]">
-                            <span class="absolute top-4 left-4 px-3 py-1.5 rounded-lg font-bold text-sm z-10 backdrop-blur-sm bg-white/90 text-main border border-line">BEFORE</span>
-                            <div class="w-full aspect-video bg-[#F1F3F5] flex items-center justify-center relative">
-                                <img src="./images/scaleout-response-before.png" alt="Scale Out 전 높은 응답시간 지연 그래프" data-zoom class="w-full h-auto aspect-video object-contain block cursor-zoom-in transition-transform duration-300 motion-reduce:transition-none hover:scale-[1.02]" loading="lazy" onerror="this.style.display='none'">
-                            </div>
-                            <p class="p-4 bg-white border-t border-line text-[15px] text-sub leading-normal break-keep">CPU 포화로 요청이 대기하면서 P95와 P99 응답시간이 크게 증가했다.</p>
+                <a href="./cases/likes-aggregation.html" data-fade class="group opacity-0 translate-y-[30px] transition-[opacity,transform,box-shadow,border-color] duration-[800ms] ease-out motion-reduce:transition-none bg-card border border-line rounded-3xl p-6 md:p-9 shadow-soft hover:-translate-y-1 hover:shadow-soft-hover hover:border-primary-light">
+                    <div class="flex items-start justify-between gap-5 mb-7">
+                        <div>
+                            <span class="inline-block px-3 py-1 bg-primary-light text-primary rounded-full text-[13px] font-semibold mb-4">03 · Query</span>
+                            <h3 class="text-[26px] font-bold leading-tight">likes 450만 건 풀스캔 제거</h3>
                         </div>
-                        <div class="relative border border-line rounded-xl overflow-hidden bg-[#FAFAFA]">
-                            <span class="absolute top-4 left-4 px-3 py-1.5 rounded-lg font-bold text-sm z-10 backdrop-blur-sm bg-primary text-white">AFTER</span>
-                            <div class="w-full aspect-video bg-[#F1F3F5] flex items-center justify-center relative">
-                                <img src="./images/scaleout-response-after.png" alt="Scale Out 후 응답시간 안정화 그래프" data-zoom class="w-full h-auto aspect-video object-contain block cursor-zoom-in transition-transform duration-300 motion-reduce:transition-none hover:scale-[1.02]" loading="lazy" onerror="this.style.display='none'">
-                            </div>
-                            <p class="p-4 bg-white border-t border-line text-[15px] text-sub leading-normal break-keep">요청이 두 인스턴스로 분산되면서 P99가 7,511ms에서 201ms로 감소했다.</p>
-                        </div>
+                        <span class="text-2xl text-primary transition-transform duration-300 motion-reduce:transition-none group-hover:translate-x-1" aria-hidden="true">→</span>
                     </div>
-                </div>
+                    <p class="text-sub mb-7 break-keep">집계와 개인화를 분리하고 비정규화 count를 활용해 별도 집계 인덱스 없이도 풀스캔을 구조적으로 제거했습니다.</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6 font-mono">
+                        <div class="bg-page rounded-xl p-4"><span class="block text-xs text-sub mb-1 font-sans">평균 응답</span><strong class="text-xl text-primary">10,460 → 167ms</strong></div>
+                        <div class="bg-page rounded-xl p-4"><span class="block text-xs text-sub mb-1 font-sans">에러율</span><strong class="text-xl text-primary">15.53 → 0%</strong></div>
+                    </div>
+                    <div class="flex flex-wrap gap-2"><span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">Query Split</span><span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">Denormalization</span><span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">Batch</span></div>
+                </a>
+
+                <a href="./cases/scale-out.html" data-fade class="group opacity-0 translate-y-[30px] transition-[opacity,transform,box-shadow,border-color] duration-[800ms] ease-out motion-reduce:transition-none bg-card border border-line rounded-3xl p-6 md:p-9 shadow-soft hover:-translate-y-1 hover:shadow-soft-hover hover:border-primary-light">
+                    <div class="flex items-start justify-between gap-5 mb-7">
+                        <div>
+                            <span class="inline-block px-3 py-1 bg-primary-light text-primary rounded-full text-[13px] font-semibold mb-4">04 · Application</span>
+                            <h3 class="text-[26px] font-bold leading-tight">HAProxy 기반 Scale Out</h3>
+                        </div>
+                        <span class="text-2xl text-primary transition-transform duration-300 motion-reduce:transition-none group-hover:translate-x-1" aria-hidden="true">→</span>
+                    </div>
+                    <p class="text-sub mb-7 break-keep">App CPU 포화를 확인하고 인스턴스를 수평 확장했습니다. 처리량이 늘자 병목이 MySQL로 이동하는 과정까지 추적했습니다.</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6 font-mono">
+                        <div class="bg-page rounded-xl p-4"><span class="block text-xs text-sub mb-1 font-sans">TPS</span><strong class="text-xl text-primary">274 → 527</strong></div>
+                        <div class="bg-page rounded-xl p-4"><span class="block text-xs text-sub mb-1 font-sans">평균 응답</span><strong class="text-xl text-primary">867 → 32ms</strong></div>
+                    </div>
+                    <div class="flex flex-wrap gap-2"><span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">HAProxy</span><span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">Docker</span><span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">JMeter</span></div>
+                </a>
+
+                <a href="./cases/read-replica.html" data-fade class="group opacity-0 translate-y-[30px] transition-[opacity,transform,box-shadow,border-color] duration-[800ms] ease-out motion-reduce:transition-none bg-card border border-line rounded-3xl p-6 md:p-9 shadow-soft hover:-translate-y-1 hover:shadow-soft-hover hover:border-primary-light">
+                    <div class="flex items-start justify-between gap-5 mb-7">
+                        <div>
+                            <span class="inline-block px-3 py-1 bg-primary-light text-primary rounded-full text-[13px] font-semibold mb-4">05 · Database</span>
+                            <h3 class="text-[26px] font-bold leading-tight">MySQL Read Replica</h3>
+                        </div>
+                        <span class="text-2xl text-primary transition-transform duration-300 motion-reduce:transition-none group-hover:translate-x-1" aria-hidden="true">→</span>
+                    </div>
+                    <p class="text-sub mb-7 break-keep">읽기 트래픽을 Replica로 분산하고, 복제 지연은 Sticky Primary 라우팅으로 보완해 성능과 정합성을 함께 다뤘습니다.</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6 font-mono">
+                        <div class="bg-page rounded-xl p-4"><span class="block text-xs text-sub mb-1 font-sans">평균 응답</span><strong class="text-xl text-primary">32 → 10ms</strong></div>
+                        <div class="bg-page rounded-xl p-4"><span class="block text-xs text-sub mb-1 font-sans">Primary CPU</span><strong class="text-xl text-primary">100 → 25%</strong></div>
+                    </div>
+                    <div class="flex flex-wrap gap-2"><span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">MySQL</span><span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">GTID</span><span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">Spring AOP</span></div>
+                </a>
+
+                <a href="./cases/cicd.html" data-fade class="group opacity-0 translate-y-[30px] transition-[opacity,transform,box-shadow,border-color] duration-[800ms] ease-out motion-reduce:transition-none bg-card border border-line rounded-3xl p-6 md:p-9 shadow-soft hover:-translate-y-1 hover:shadow-soft-hover hover:border-primary-light">
+                    <div class="flex items-start justify-between gap-5 mb-7">
+                        <div>
+                            <span class="inline-block px-3 py-1 bg-primary-light text-primary rounded-full text-[13px] font-semibold mb-4">06 · Delivery</span>
+                            <h3 class="text-[26px] font-bold leading-tight">CI/CD와 모니터링 자동화</h3>
+                        </div>
+                        <span class="text-2xl text-primary transition-transform duration-300 motion-reduce:transition-none group-hover:translate-x-1" aria-hidden="true">→</span>
+                    </div>
+                    <p class="text-sub mb-7 break-keep">PR 품질 게이트부터 Jib 이미지 빌드, EC2 배포, Prometheus·Grafana 관측 환경까지 반복 절차를 자동화했습니다.</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6 font-mono">
+                        <div class="bg-page rounded-xl p-4"><span class="block text-xs text-sub mb-1 font-sans">테스트 커버리지</span><strong class="text-xl text-primary">80%+</strong></div>
+                        <div class="bg-page rounded-xl p-4"><span class="block text-xs text-sub mb-1 font-sans">Major 이슈</span><strong class="text-xl text-primary">0건</strong></div>
+                    </div>
+                    <div class="flex flex-wrap gap-2"><span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">GitHub Actions</span><span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">Jib</span><span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">SonarCloud</span></div>
+                </a>
             </div>
         </section>
 
-        <!-- 4. 강점 카드 2: MySQL Read Replica -->
-        <section id="read-replica" class="max-w-page mx-auto px-6">
-            <div data-fade class="opacity-0 translate-y-[30px] transition-[opacity,transform] duration-[800ms] ease-out motion-reduce:transition-none bg-card border border-line rounded-3xl px-5 py-8 md:p-[60px] shadow-soft mb-10">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10 mb-12">
-                    <div>
-                        <span class="inline-block px-3.5 py-1.5 bg-primary-light text-primary rounded-[20px] text-sm font-semibold mb-6">문제 해결 사례 2</span>
-                        <h3 class="text-[32px] font-bold mb-6">MySQL Read Replica</h3>
-
-                        <div class="mb-6">
-                            <h4 class="text-base font-bold text-main mb-2 flex items-center gap-2"><span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>문제 상황</h4>
-                            <p class="text-base text-sub break-keep">애플리케이션을 Scale Out한 뒤 MySQL CPU 사용률이 약 100%에 도달했습니다. 애플리케이션 병목이 해소되면서 단일 MySQL이 읽기와 쓰기 요청을 모두 처리하는 구조가 <strong>새로운 병목</strong>이 되었습니다.</p>
-                        </div>
-
-                        <div class="mb-6">
-                            <h4 class="text-base font-bold text-main mb-2 flex items-center gap-2"><span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>해결 방법</h4>
-                            <p class="text-base text-sub break-keep">MySQL Read Replica를 도입해 읽기와 쓰기 부하를 분리했습니다.</p>
-                            <ul class="text-base text-sub break-keep pl-5 list-disc">
-                                <li class="mb-1">Master DB: 쓰기 요청 처리</li>
-                                <li class="mb-1">Replica DB: 읽기 요청 처리 (읽기 트래픽 약 90% 분산)</li>
-                                <li class="mb-1">쓰기 직후 데이터 정합성이 필요한 요청은 일정 시간 Master를 조회하는 Sticky Primary 방식 적용</li>
-                            </ul>
-                        </div>
-
-                        <div class="mb-6">
-                            <p class="text-primary font-semibold break-keep">
-                                "Read Replica의 핵심 성과는 단순한 TPS 증가가 아니라, Master의 부하를 분산하고 응답시간을 안정화한 것입니다."
-                            </p>
-                        </div>
-
-                        <div class="flex flex-wrap gap-2 mt-6">
-                            <span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">MySQL Replication</span>
-                            <span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">Spring Data JPA</span>
-                            <span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">LazyConnectionDataSourceProxy</span>
-                            <span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">Grafana</span>
-                        </div>
-                    </div>
-
-                    <div class="bg-page rounded-2xl p-6">
-                        <h4 class="font-bold text-base mb-4">개선 결과 (Read Replica)</h4>
-                        <div class="grid gap-3 font-mono">
-                            <div class="flex justify-between items-center pb-3 border-b border-dashed border-line">
-                                <span class="font-medium">평균 응답시간</span>
-                                <span>32ms <span class="text-sub">→</span> <strong class="text-primary">10ms</strong></span>
-                            </div>
-                            <div class="flex justify-between items-center pb-3 border-b border-dashed border-line">
-                                <span class="font-medium">P99 응답시간</span>
-                                <span>237ms <span class="text-sub">→</span> <strong class="text-primary">80ms</strong></span>
-                            </div>
-                            <div class="flex justify-between items-center pb-3 border-b border-dashed border-line">
-                                <span class="font-medium">최대 응답시간</span>
-                                <span>1,338ms <span class="text-sub">→</span> <strong class="text-primary">469ms</strong></span>
-                            </div>
-                            <div class="flex justify-between items-center pb-3 border-b border-dashed border-line">
-                                <span class="font-medium">Master CPU</span>
-                                <span>약 100% <span class="text-sub">→</span> <strong class="text-primary">약 25%</strong></span>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="font-medium">TPS 증가폭</span>
-                                <span>약 527/s <span class="text-sub">→</span> <strong class="text-primary">약 539/s</strong></span>
-                            </div>
-                        </div>
-                        <p class="text-[13px] text-sub mt-4">
-                            * 테스트에는 500개의 고정 스레드와 Think Time이 적용되어 처리량(TPS) 증가에는 제한이 있었습니다. 따라서 응답시간 최적화와 Master 부하 감소에 초점을 맞추었습니다.
-                        </p>
-                    </div>
-                </div>
-
-                <div class="border-t border-line pt-12">
-                    <h4 class="text-xl font-bold mb-6 text-center">DB CPU 사용률 변화</h4>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-                        <div class="relative border border-line rounded-xl overflow-hidden bg-[#FAFAFA]">
-                            <span class="absolute top-4 left-4 px-3 py-1.5 rounded-lg font-bold text-sm z-10 backdrop-blur-sm bg-white/90 text-main border border-line">BEFORE</span>
-                            <div class="w-full aspect-video bg-[#F1F3F5] flex items-center justify-center relative">
-                                <img src="./images/replica-cpu-before.png" alt="Read Replica 적용 전 단일 MySQL CPU 포화 그래프" data-zoom class="w-full h-auto aspect-video object-contain block cursor-zoom-in transition-transform duration-300 motion-reduce:transition-none hover:scale-[1.02]" loading="lazy" onerror="this.style.display='none'">
-                            </div>
-                            <p class="p-4 bg-white border-t border-line text-[15px] text-sub leading-normal break-keep">단일 MySQL이 읽기와 쓰기를 모두 처리하면서 CPU 사용률이 약 100%에 도달했다.</p>
-                        </div>
-                        <div class="relative border border-line rounded-xl overflow-hidden bg-[#FAFAFA]">
-                            <span class="absolute top-4 left-4 px-3 py-1.5 rounded-lg font-bold text-sm z-10 backdrop-blur-sm bg-primary text-white">AFTER</span>
-                            <div class="w-full aspect-video bg-[#F1F3F5] flex items-center justify-center relative">
-                                <img src="./images/replica-cpu-after.png" alt="Read Replica 적용 후 Master DB 부하 감소 그래프" data-zoom class="w-full h-auto aspect-video object-contain block cursor-zoom-in transition-transform duration-300 motion-reduce:transition-none hover:scale-[1.02]" loading="lazy" onerror="this.style.display='none'">
-                            </div>
-                            <p class="p-4 bg-white border-t border-line text-[15px] text-sub leading-normal break-keep">Master는 쓰기에 집중하고 Replica가 읽기 요청을 담당하면서 Master CPU가 약 25%로 감소했다.</p>
-                        </div>
-                    </div>
-
-                    <h4 class="text-xl font-bold mb-6 text-center mt-14">응답시간(Tail Latency) 변화</h4>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-                        <div class="relative border border-line rounded-xl overflow-hidden bg-[#FAFAFA]">
-                            <span class="absolute top-4 left-4 px-3 py-1.5 rounded-lg font-bold text-sm z-10 backdrop-blur-sm bg-white/90 text-main border border-line">BEFORE</span>
-                            <div class="w-full aspect-video bg-[#F1F3F5] flex items-center justify-center relative">
-                                <img src="./images/replica-response-before.png" alt="Read Replica 적용 전 Tail Latency 증가 그래프" data-zoom class="w-full h-auto aspect-video object-contain block cursor-zoom-in transition-transform duration-300 motion-reduce:transition-none hover:scale-[1.02]" loading="lazy" onerror="this.style.display='none'">
-                            </div>
-                            <p class="p-4 bg-white border-t border-line text-[15px] text-sub leading-normal break-keep">단일 MySQL에서 읽기와 쓰기 쿼리가 경쟁하면서 Tail Latency가 증가했다.</p>
-                        </div>
-                        <div class="relative border border-line rounded-xl overflow-hidden bg-[#FAFAFA]">
-                            <span class="absolute top-4 left-4 px-3 py-1.5 rounded-lg font-bold text-sm z-10 backdrop-blur-sm bg-primary text-white">AFTER</span>
-                            <div class="w-full aspect-video bg-[#F1F3F5] flex items-center justify-center relative">
-                                <img src="./images/replica-response-after.png" alt="Read Replica 적용 후 응답시간 감소 그래프" data-zoom class="w-full h-auto aspect-video object-contain block cursor-zoom-in transition-transform duration-300 motion-reduce:transition-none hover:scale-[1.02]" loading="lazy" onerror="this.style.display='none'">
-                            </div>
-                            <p class="p-4 bg-white border-t border-line text-[15px] text-sub leading-normal break-keep">읽기 쿼리를 Replica로 분산한 뒤 평균 응답시간은 10ms, P99는 80ms까지 감소했다.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- 5. 개선 결과 검증 역량 카드 -->
-        <section id="verification" class="max-w-page mx-auto px-6">
-            <div data-fade class="opacity-0 translate-y-[30px] transition-[opacity,transform] duration-[800ms] ease-out motion-reduce:transition-none bg-gradient-to-br from-[#111827] to-[#1F2937] text-white rounded-3xl p-[60px] text-center">
-                <h2 class="text-[32px] md:text-[42px] font-bold mb-4 leading-[1.3] text-white">성능 개선은 코드를 변경하는 것으로 끝나지 않습니다.</h2>
-                <p class="text-lg max-w-[800px] mx-auto text-[#9CA3AF]">측정 결과가 달라져야 개선이라고 판단합니다. 기술을 적용했다는 사실보다 <strong>실제 지표가 어떻게 달라졌는지</strong>를 중요하게 생각합니다.</p>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mt-10 text-left">
-                    <div class="bg-white/10 p-5 rounded-xl flex items-start gap-3">
-                        <span class="text-secondary text-xl">✓</span>
-                        <p>JMeter로 동일한 조건의 부하테스트 수행</p>
-                    </div>
-                    <div class="bg-white/10 p-5 rounded-xl flex items-start gap-3">
-                        <span class="text-secondary text-xl">✓</span>
-                        <p>Prometheus로 서버 메트릭 실시간 수집</p>
-                    </div>
-                    <div class="bg-white/10 p-5 rounded-xl flex items-start gap-3">
-                        <span class="text-secondary text-xl">✓</span>
-                        <p>Grafana로 애플리케이션과 DB 자원 관찰</p>
-                    </div>
-                    <div class="bg-white/10 p-5 rounded-xl flex items-start gap-3">
-                        <span class="text-secondary text-xl">✓</span>
-                        <p>평균 응답시간뿐 아니라 P95, P99 확인</p>
-                    </div>
-                    <div class="bg-white/10 p-5 rounded-xl flex items-start gap-3">
-                        <span class="text-secondary text-xl">✓</span>
-                        <p>Scale Out 이후 병목이 MySQL로 이동한 과정 추적</p>
-                    </div>
-                    <div class="bg-white/10 p-5 rounded-xl flex items-start gap-3">
-                        <span class="text-secondary text-xl">✓</span>
-                        <p>Read Replica 도입 후 Master/Replica 부하 분산 확인</p>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- 6. CTA -->
+        <!-- 4. CTA -->
         <section class="max-w-page mx-auto px-6">
             <div id="cta" data-fade class="opacity-0 translate-y-[30px] transition-[opacity,transform] duration-[800ms] ease-out motion-reduce:transition-none text-center bg-primary-light rounded-3xl px-6 py-20 mb-[110px]">
-                <h2 class="text-4xl font-bold mb-4 text-primary">전체 분석 과정이 궁금한가요?</h2>
-                <p class="text-lg max-w-[800px] mx-auto text-main">
-                    Scale Out과 MySQL Read Replica를 적용한 이유, 테스트 환경, 구현 방법, 한계와 다음 개선 방향을 Velog에 상세히 기록했습니다.<br>
-                    <strong>문제를 재현하고, 원인을 찾고, 결과로 증명하는 개발자를 찾고 있나요?</strong>
-                </p>
+                <h2 class="text-4xl font-bold mb-4 text-primary">더 깊은 분석 과정이 궁금한가요?</h2>
+                <p class="text-lg max-w-[800px] mx-auto text-main break-keep">각 사례에 담지 못한 실험 기록과 구현 세부 내용은 Velog에 정리했습니다.<br><strong>문제를 재현하고, 원인을 찾고, 결과로 증명하는 개발자를 찾고 있나요?</strong></p>
                 <div class="flex flex-col md:flex-row flex-wrap gap-4 justify-center mt-8">
-                    <a href="https://velog.io/@chooh1010/MySQL-Read-Replica-도입과-부하테스트-77vr9rfz" target="_blank" class="inline-flex items-center justify-center px-7 py-3.5 rounded-xl font-semibold text-base min-h-[48px] w-full md:w-auto transition duration-300 motion-reduce:transition-none bg-primary text-white hover:bg-primary-dark hover:-translate-y-0.5">Scale Out 테스트 글 보기</a>
-                    <a href="https://velog.io/@chooh1010/MySQL-Read-Replica-도입" target="_blank" class="inline-flex items-center justify-center px-7 py-3.5 rounded-xl font-semibold text-base min-h-[48px] w-full md:w-auto transition duration-300 motion-reduce:transition-none bg-secondary text-white hover:-translate-y-0.5">MySQL Read Replica 글 보기</a>
-                    <a href="https://github.com/chooh1010" target="_blank" class="inline-flex items-center justify-center px-7 py-3.5 rounded-xl font-semibold text-base min-h-[48px] w-full md:w-auto transition duration-300 motion-reduce:transition-none bg-transparent text-main border border-line hover:bg-card hover:border-main">GitHub 코드 보기</a>
+                    <a href="https://velog.io/@chooh1010" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center px-7 py-3.5 rounded-xl font-semibold text-base min-h-[48px] w-full md:w-auto transition duration-300 motion-reduce:transition-none bg-primary text-white hover:bg-primary-dark hover:-translate-y-0.5">Velog 전체 글 보기</a>
+                    <a href="https://github.com/chooh1010" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center px-7 py-3.5 rounded-xl font-semibold text-base min-h-[48px] w-full md:w-auto transition duration-300 motion-reduce:transition-none bg-transparent text-main border border-line hover:bg-card hover:border-main">GitHub 코드 보기</a>
                 </div>
             </div>
         </section>
