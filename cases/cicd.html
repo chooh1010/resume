@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ko" class="scroll-smooth motion-reduce:scroll-auto">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CI/CD 자동화 | 조용현 포트폴리오</title>
+    <meta name="description" content="수동 빌드·배포·모니터링의 반복 시간 소모를 GitHub Actions + Jib + Prometheus·Grafana로 자동화. PR 품질 게이트(커버리지 80%, SonarQube Major 0건)까지 구성했습니다.">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="article">
+    <meta property="og:title" content="CI/CD 자동화 | 조용현 포트폴리오">
+    <meta property="og:description" content="main push → 빌드 → Jib 이미지 → EC2 배포 자동화. PR 단계 품질 게이트로 기준 미달 코드의 머지를 제한.">
+    <meta property="og:url" content="https://chooh1010.github.io/resume/cases/cicd.html">
+
+    <!-- Favicon (emoji, no external file) -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📈</text></svg>">
+
+    <!-- 폰트 로드: Pretendard(한글), Inter(영문), JetBrains Mono(수치) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css" />
+
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        page: '#F7F8FC',
+                        card: '#FFFFFF',
+                        main: '#111827',
+                        sub: '#667085',
+                        primary: '#5B5FEF',
+                        'primary-dark': '#4A4DD9',
+                        'primary-light': '#EEF0FF',
+                        secondary: '#22B8A7',
+                        line: '#E5E7EB',
+                    },
+                    fontFamily: {
+                        sans: ['Pretendard', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'Roboto', 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', 'sans-serif'],
+                        en: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    boxShadow: {
+                        soft: '0 10px 40px -10px rgba(0,0,0,0.05)',
+                        'soft-hover': '0 15px 40px -10px rgba(91,95,239,0.1)',
+                    },
+                    maxWidth: {
+                        page: '1200px',
+                    },
+                },
+            },
+        };
+    </script>
+</head>
+<body class="bg-page text-main font-sans leading-[1.6] overflow-x-hidden">
+
+    <!-- 헤더 -->
+    <header class="fixed top-0 w-full bg-[rgba(247,248,252,0.8)] backdrop-blur-md z-[100] border-b border-line">
+        <div class="max-w-page mx-auto px-6">
+            <nav class="flex justify-between items-center h-[70px]">
+                <a href="../index.html" class="font-bold text-xl tracking-[-0.5px]">조용현 | I AM</a>
+                <div class="hidden md:flex gap-8">
+                    <a href="../index.html" class="text-[15px] font-medium text-sub transition duration-300 motion-reduce:transition-none hover:text-primary">← 전체 사례</a>
+                    <a href="#problem" class="text-[15px] font-medium text-sub transition duration-300 motion-reduce:transition-none hover:text-primary">문제</a>
+                    <a href="#solution" class="text-[15px] font-medium text-sub transition duration-300 motion-reduce:transition-none hover:text-primary">파이프라인</a>
+                    <a href="#ops" class="text-[15px] font-medium text-sub transition duration-300 motion-reduce:transition-none hover:text-primary">운영·보안</a>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <!-- 1. 히어로 -->
+        <section class="pt-[160px] pb-[80px]">
+            <div class="max-w-page mx-auto px-6">
+                <div data-fade class="opacity-0 translate-y-[30px] transition-[opacity,transform] duration-[800ms] ease-out motion-reduce:transition-none text-center">
+                    <span class="inline-block px-3.5 py-1.5 bg-primary-light text-primary rounded-[20px] text-sm font-semibold mb-6">문제 해결 사례 · Popping Community</span>
+                    <h1 class="text-[38px] md:text-[56px] font-extrabold leading-[1.2] tracking-[-1px] mb-6">배포·모니터링 <span class="bg-gradient-to-br from-primary to-[#8A8DFF] bg-clip-text text-transparent">자동화</span></h1>
+                    <p class="text-xl text-sub max-w-[760px] mx-auto mb-12 break-keep">
+                        성능 개선은 "여러 번 빠르게 배포하고 검증"하는 반복 작업입니다.<br>
+                        수동 빌드·배포·상태 확인이 문제 해결 속도를 함께 늦추고 있어, 파이프라인 전체를 자동화했습니다.
+                    </p>
+                </div>
+
+                <div data-fade class="opacity-0 translate-y-[30px] transition-[opacity,transform] duration-[800ms] ease-out motion-reduce:transition-none grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 text-left">
+                    <div class="bg-card border border-line rounded-3xl px-6 py-8 shadow-soft">
+                        <div class="text-sm text-sub mb-2 font-semibold">배포 트리거</div>
+                        <div class="text-2xl font-bold flex items-baseline gap-2 flex-wrap font-mono">
+                            <span class="text-sub line-through text-lg opacity-70">수동 절차</span>
+                            <span class="text-line text-base">→</span>
+                            <span class="text-primary text-[28px] tracking-[-1px]">main push</span>
+                        </div>
+                        <div class="text-[13px] text-sub mt-3 pt-3 border-t border-line">빌드 → 이미지 → EC2 배포 전자동</div>
+                    </div>
+                    <div class="bg-card border border-line rounded-3xl px-6 py-8 shadow-soft">
+                        <div class="text-sm text-sub mb-2 font-semibold">PR 커버리지 게이트</div>
+                        <div class="text-2xl font-bold flex items-baseline gap-2 flex-wrap font-mono">
+                            <span class="text-primary text-[32px] tracking-[-1px]">80%+</span>
+                        </div>
+                        <div class="text-[13px] text-sub mt-3 pt-3 border-t border-line">미달 시 머지 제한 (Jacoco + SonarCloud)</div>
+                    </div>
+                    <div class="bg-card border border-line rounded-3xl px-6 py-8 shadow-soft">
+                        <div class="text-sm text-sub mb-2 font-semibold">SonarQube Major 이슈</div>
+                        <div class="text-2xl font-bold flex items-baseline gap-2 flex-wrap font-mono">
+                            <span class="text-primary text-[32px] tracking-[-1px]">0건</span>
+                        </div>
+                        <div class="text-[13px] text-sub mt-3 pt-3 border-t border-line">1건이라도 있으면 머지 제한</div>
+                    </div>
+                    <div class="bg-card border border-line rounded-3xl px-6 py-8 shadow-soft">
+                        <div class="text-sm text-sub mb-2 font-semibold">Dockerfile</div>
+                        <div class="text-2xl font-bold flex items-baseline gap-2 flex-wrap font-mono">
+                            <span class="text-primary text-[32px] tracking-[-1px]">불필요</span>
+                        </div>
+                        <div class="text-[13px] text-sub mt-3 pt-3 border-t border-line">Jib Gradle 플러그인으로 이미지 빌드</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. 문제 상황 -->
+        <section id="problem" class="max-w-page mx-auto px-6 pb-[80px]">
+            <div data-fade class="opacity-0 translate-y-[30px] transition-[opacity,transform] duration-[800ms] ease-out motion-reduce:transition-none bg-card border border-line rounded-3xl px-5 py-8 md:p-[60px] shadow-soft">
+                <span class="inline-block px-3.5 py-1.5 bg-primary-light text-primary rounded-[20px] text-sm font-semibold mb-6">STEP 1 · 문제 상황</span>
+                <h2 class="text-[28px] md:text-[36px] font-bold mb-6 leading-[1.3]">수동 절차가 성능 개선 사이클 전체를 늦추고 있었습니다</h2>
+                <p class="text-base text-sub break-keep mb-6">
+                    빌드, 이미지 생성, 배포, 운영 상태 확인이 모두 수동이어서 코드 수정 후 반영까지 시간이 걸리고 실수 가능성이 높았습니다.
+                    특히 이 프로젝트의 성능 개선 작업(<a href="./comment-cache.html" class="text-primary hover:underline">캐싱</a>,
+                    <a href="./scale-out.html" class="text-primary hover:underline">Scale Out</a>,
+                    <a href="./read-replica.html" class="text-primary hover:underline">Read Replica</a>)은
+                    <strong class="text-main">배포 → 부하테스트 → 지표 확인</strong>을 여러 번 반복해야 하므로, 수동 절차가 문제 해결 속도를 함께 늦추고 있었습니다.
+                </p>
+                <p class="text-base text-sub break-keep">
+                    또한 팀 단위 프로젝트라 "빌드 → 배포" 자동화만으로는 부족했습니다. PR마다 코드 품질과 테스트 커버리지를 자동 검증해,
+                    <strong class="text-main">기준을 충족한 코드만 머지되도록 하는 품질 게이트</strong>가 필요했습니다.
+                </p>
+            </div>
+        </section>
+
+        <!-- 3. 파이프라인 -->
+        <section id="solution" class="max-w-page mx-auto px-6 pb-[80px]">
+            <div data-fade class="opacity-0 translate-y-[30px] transition-[opacity,transform] duration-[800ms] ease-out motion-reduce:transition-none bg-card border border-line rounded-3xl px-5 py-8 md:p-[60px] shadow-soft">
+                <span class="inline-block px-3.5 py-1.5 bg-primary-light text-primary rounded-[20px] text-sm font-semibold mb-6">STEP 2 · 해결 방법</span>
+                <h2 class="text-[28px] md:text-[36px] font-bold mb-6 leading-[1.3]">PR 품질 게이트 + 배포 자동화, 두 단계 파이프라인</h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10 mb-10">
+                    <div>
+                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>배포 단계 (main push 시)</h3>
+                        <pre class="bg-main text-[#E5E7EB] rounded-xl p-5 text-[13px] font-mono overflow-x-auto leading-relaxed">main push
+  ↓
+GitHub Actions
+  ├─ JDK 21 + Gradle 캐시 복원
+  ├─ Docker Hub 로그인
+  ├─ ./gradlew jib
+  │    └─ 이미지 빌드 → Docker Hub push
+  └─ SSH → EC2
+       ├─ docker compose pull app
+       └─ docker compose up -d app
+            └─ app 서비스만 교체
+               (MySQL·exporter는 무중단 유지)
+
+Prometheus → Grafana (배포 후 지표 관찰)</pre>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>PR 단계 (품질 게이트)</h3>
+                        <div class="overflow-x-auto mb-4">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-page">
+                                        <th class="p-3 border border-line text-sm font-semibold">검사 항목</th>
+                                        <th class="p-3 border border-line text-sm font-semibold">기준</th>
+                                        <th class="p-3 border border-line text-sm font-semibold">도구</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="text-sm text-sub">
+                                    <tr>
+                                        <td class="p-3 border border-line font-medium text-main">테스트 커버리지</td>
+                                        <td class="p-3 border border-line">80% 이상</td>
+                                        <td class="p-3 border border-line">Jacoco → SonarCloud</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="p-3 border border-line font-medium text-main">코드 품질</td>
+                                        <td class="p-3 border border-line">Major 이슈 0건</td>
+                                        <td class="p-3 border border-line">SonarCloud (GitHub App)</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="p-3 border border-line font-medium text-main">코드 스타일</td>
+                                        <td class="p-3 border border-line">네이버 핵데이 컨벤션</td>
+                                        <td class="p-3 border border-line">Checkstyle</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="text-base text-sub break-keep">
+                            Jacoco XML 리포트와 Checkstyle 리포트 경로를 SonarCloud에 함께 전달해 <strong class="text-main">한 번의 분석으로 두 품질 지표를 동시 검사</strong>합니다.
+                            기준 미달 PR은 머지가 제한됩니다.
+                        </p>
+                    </div>
+                </div>
+
+                <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>Jib — Dockerfile 없이, 저사양 환경에 맞춘 JVM 튜닝까지</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10 mb-10">
+                    <div>
+                        <pre class="bg-main text-[#E5E7EB] rounded-xl p-5 text-[13px] font-mono overflow-x-auto leading-relaxed">jib {
+    from { image = "eclipse-temurin:21-jdk-alpine" }
+    to {
+        image = "chooh1010/popping-community"
+        tags = ['latest', timestamp]
+    }
+    container {
+        jvmFlags = [
+            '-XX:+UseContainerSupport',
+            '-Xms200m', '-Xmx240m',
+            '-XX:ReservedCodeCacheSize=64m',
+            '-XX:MaxMetaspaceSize=128m',
+            '-XX:+UseStringDeduplication', ...
+        ]
+    }
+}</pre>
+                    </div>
+                    <div>
+                        <p class="text-base text-sub break-keep mb-4">
+                            EC2 t2.micro(1GB)에서 MySQL·exporter와 메모리를 나눠 써야 하므로, 힙(200~240m)·메타스페이스(128m)·코드캐시(64m)를 세분화해 상한을 고정했습니다.
+                            초기 힙을 200m으로 고정한 이유는 힙이 천천히 늘어나는 동안 GC가 과도하게 발생하는 것을 막기 위해서입니다.
+                        </p>
+                        <p class="text-base text-sub break-keep">
+                            Jib은 Dockerfile 없이 Gradle 플러그인만으로 레이어드 이미지를 만들고 Docker Hub에 push합니다.
+                            타임스탬프 태그를 함께 남겨 특정 시점 이미지로의 롤백이 가능합니다.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap gap-2">
+                    <span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">GitHub Actions</span>
+                    <span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">Jib</span>
+                    <span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">SonarCloud + Jacoco</span>
+                    <span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">Checkstyle</span>
+                    <span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">Docker Compose</span>
+                    <span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">Prometheus · Grafana</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. 운영·보안 -->
+        <section id="ops" class="max-w-page mx-auto px-6 pb-[80px]">
+            <div data-fade class="opacity-0 translate-y-[30px] transition-[opacity,transform] duration-[800ms] ease-out motion-reduce:transition-none bg-card border border-line rounded-3xl px-5 py-8 md:p-[60px] shadow-soft">
+                <span class="inline-block px-3.5 py-1.5 bg-primary-light text-primary rounded-[20px] text-sm font-semibold mb-6">STEP 3 · 운영·보안</span>
+                <h2 class="text-[28px] md:text-[36px] font-bold mb-6 leading-[1.3]">노출 범위와 자격증명을 최소화했습니다</h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10 mb-10">
+                    <div>
+                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>포트 바인딩 제한</h3>
+                        <pre class="bg-main text-[#E5E7EB] rounded-xl p-5 text-[13px] font-mono overflow-x-auto leading-relaxed">app:
+  ports:
+    - "8080:8080"             # 서비스 포트만 공개
+    - "127.0.0.1:8081:8081"   # Actuator: 로컬 전용
+
+mysqld-exporter:
+  ports:
+    - "127.0.0.1:9104:9104"   # SSH 터널로만 접근</pre>
+                        <p class="text-[13px] text-sub mt-4 break-keep">
+                            Actuator·exporter는 127.0.0.1 바인딩으로 외부 직접 접근을 차단하고 SSH 터널을 통해서만 접근합니다.
+                        </p>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>자격증명 관리</h3>
+                        <ul class="text-base text-sub break-keep pl-5 list-disc">
+                            <li class="mb-2">배포 자격증명(SSH 키, Docker Hub 토큰)은 <strong class="text-main">GitHub Secrets</strong>로 관리</li>
+                            <li class="mb-2">Docker Hub는 계정 비밀번호 대신 <strong class="text-main">권한 제한 Access Token</strong> 사용 — 유출 시 해당 토큰만 폐기</li>
+                            <li class="mb-2">DB 비밀번호·AWS 키는 EC2의 <code class="font-mono text-[14px] bg-page px-1 rounded">.env</code>에만 존재, Git 미포함 (<code class="font-mono text-[14px] bg-page px-1 rounded">.env.example</code>만 커밋)</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="border-t border-line pt-10">
+                    <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>결과</h3>
+                    <p class="text-base text-sub break-keep mb-4">
+                        코드 수정 이후의 수동 작업이 제거되어, main 머지만으로 배포가 완료되고 Grafana에서 배포 직후 지표를 바로 관찰할 수 있게 됐습니다.
+                        이 개발-운영 루프가 이후 모든 성능 개선 사례의 <strong class="text-main">"동일 조건 반복 배포 + 지표 검증"</strong>을 가능하게 한 기반이 됐습니다.
+                    </p>
+                    <p class="text-primary font-semibold break-keep">
+                        "배포 자동화는 그 자체가 목적이 아니라, 문제 해결 사이클의 속도를 높이는 인프라였습니다."
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. CTA -->
+        <section class="max-w-page mx-auto px-6">
+            <div data-fade class="opacity-0 translate-y-[30px] transition-[opacity,transform] duration-[800ms] ease-out motion-reduce:transition-none text-center bg-primary-light rounded-3xl px-6 py-16 mb-[80px]">
+                <h2 class="text-3xl font-bold mb-4 text-primary">이 파이프라인 위에서 검증한 사례들</h2>
+                <p class="text-lg max-w-[800px] mx-auto text-main break-keep">
+                    자동화된 배포·모니터링 루프 위에서 캐싱부터 Read Replica까지 반복 검증했습니다.
+                </p>
+                <div class="flex flex-col md:flex-row flex-wrap gap-4 justify-center mt-8">
+                    <a href="../index.html" class="inline-flex items-center justify-center px-7 py-3.5 rounded-xl font-semibold text-base min-h-[48px] w-full md:w-auto transition duration-300 motion-reduce:transition-none bg-primary text-white hover:bg-primary-dark hover:-translate-y-0.5">전체 사례 보기</a>
+                    <a href="https://velog.io/@chooh1010" target="_blank" class="inline-flex items-center justify-center px-7 py-3.5 rounded-xl font-semibold text-base min-h-[48px] w-full md:w-auto transition duration-300 motion-reduce:transition-none bg-secondary text-white hover:-translate-y-0.5">Velog 전체 분석 글 보기</a>
+                    <a href="https://github.com/chooh1010" target="_blank" class="inline-flex items-center justify-center px-7 py-3.5 rounded-xl font-semibold text-base min-h-[48px] w-full md:w-auto transition duration-300 motion-reduce:transition-none bg-transparent text-main border border-line hover:bg-card hover:border-main">GitHub 코드 보기</a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 푸터 -->
+    <footer class="border-t border-line py-[60px] text-center">
+        <div class="max-w-page mx-auto px-6 flex flex-col items-center gap-6">
+            <div class="flex flex-wrap justify-center gap-6">
+                <span class="font-bold text-main">조용현 | Backend Engineer</span>
+                <a href="../index.html" class="text-sub font-medium hover:text-primary">홈</a>
+                <a href="https://github.com/chooh1010" target="_blank" class="text-sub font-medium hover:text-primary">GitHub</a>
+                <a href="https://velog.io/@chooh1010" target="_blank" class="text-sub font-medium hover:text-primary">Velog</a>
+                <a href="mailto:chooh1010@gmail.com" class="text-sub font-medium hover:text-primary">Email</a>
+            </div>
+            <p class="text-sm text-sub">
+                Built with HTML, Tailwind CSS and Vanilla JavaScript.<br>
+                Measured, tested and improved by Cho Yonghyeon.
+            </p>
+        </div>
+    </footer>
+
+    <!-- 기능 스크립트 -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // 1. 부드러운 스크롤 (헤더 메뉴 클릭 시)
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    const targetId = this.getAttribute('href');
+                    if (targetId === '#') return;
+
+                    const targetElement = document.querySelector(targetId);
+                    if (targetElement) {
+                        e.preventDefault();
+                        const offsetTop = targetElement.getBoundingClientRect().top + window.scrollY - 80;
+                        window.scrollTo({ top: offsetTop, behavior: 'smooth' });
+                    }
+                });
+            });
+
+            // 2. Intersection Observer를 활용한 스크롤 애니메이션
+            const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            const HIDDEN_CLASSES = ['opacity-0', 'translate-y-[30px]'];
+            const revealElement = (el) => el.classList.remove(...HIDDEN_CLASSES);
+
+            const fadeUpObserver = new IntersectionObserver((entries, observer) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        revealElement(entry.target);
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, { root: null, threshold: 0.1, rootMargin: "0px 0px -50px 0px" });
+
+            document.querySelectorAll('[data-fade]').forEach(el => {
+                if (prefersReducedMotion) {
+                    revealElement(el);
+                } else {
+                    fadeUpObserver.observe(el);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
