@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="ko" class="scroll-smooth motion-reduce:scroll-auto">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>댓글 첫 페이지 캐싱 | 조용현 포트폴리오</title>
+    <meta name="description" content="인기 게시글 댓글 트리 반복 생성 병목을 Caffeine Cache-Aside로 해소. 댓글 조회 152ms → 43ms, CTE 실행 6,642건 → 458건. 캐시 스탬피드는 per-key 원자적 로딩으로 방지했습니다.">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="article">
+    <meta property="og:title" content="댓글 첫 페이지 캐싱 | 조용현 포트폴리오">
+    <meta property="og:description" content="Caffeine Cache-Aside 적용으로 댓글 조회 152ms → 43ms, CTE 실행 횟수 93% 감소. 스탬피드는 per-key 락으로 CTE 1건 고정.">
+    <meta property="og:url" content="https://chooh1010.github.io/resume/cases/comment-cache.html">
+
+    <!-- Favicon (emoji, no external file) -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📈</text></svg>">
+
+    <!-- 폰트 로드: Pretendard(한글), Inter(영문), JetBrains Mono(수치) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css" />
+
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        page: '#F7F8FC',
+                        card: '#FFFFFF',
+                        main: '#111827',
+                        sub: '#667085',
+                        primary: '#5B5FEF',
+                        'primary-dark': '#4A4DD9',
+                        'primary-light': '#EEF0FF',
+                        secondary: '#22B8A7',
+                        line: '#E5E7EB',
+                    },
+                    fontFamily: {
+                        sans: ['Pretendard', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'Roboto', 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', 'sans-serif'],
+                        en: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    boxShadow: {
+                        soft: '0 10px 40px -10px rgba(0,0,0,0.05)',
+                        'soft-hover': '0 15px 40px -10px rgba(91,95,239,0.1)',
+                    },
+                    maxWidth: {
+                        page: '1200px',
+                    },
+                },
+            },
+        };
+    </script>
+</head>
+<body class="bg-page text-main font-sans leading-[1.6] overflow-x-hidden">
+
+    <!-- 헤더 -->
+    <header class="fixed top-0 w-full bg-[rgba(247,248,252,0.8)] backdrop-blur-md z-[100] border-b border-line">
+        <div class="max-w-page mx-auto px-6">
+            <nav class="flex justify-between items-center h-[70px]">
+                <a href="../index.html" class="font-bold text-xl tracking-[-0.5px]">조용현 | I AM</a>
+                <div class="hidden md:flex gap-8">
+                    <a href="../index.html" class="text-[15px] font-medium text-sub transition duration-300 motion-reduce:transition-none hover:text-primary">← 전체 사례</a>
+                    <a href="#problem" class="text-[15px] font-medium text-sub transition duration-300 motion-reduce:transition-none hover:text-primary">문제</a>
+                    <a href="#solution" class="text-[15px] font-medium text-sub transition duration-300 motion-reduce:transition-none hover:text-primary">해결</a>
+                    <a href="#stampede" class="text-[15px] font-medium text-sub transition duration-300 motion-reduce:transition-none hover:text-primary">스탬피드</a>
+                    <a href="#result" class="text-[15px] font-medium text-sub transition duration-300 motion-reduce:transition-none hover:text-primary">결과</a>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <!-- 1. 히어로 -->
+        <section class="pt-[160px] pb-[80px]">
+            <div class="max-w-page mx-auto px-6">
+                <div data-fade class="opacity-0 translate-y-[30px] transition-[opacity,transform] duration-[800ms] ease-out motion-reduce:transition-none text-center">
+                    <span class="inline-block px-3.5 py-1.5 bg-primary-light text-primary rounded-[20px] text-sm font-semibold mb-6">문제 해결 사례 · Popping Community</span>
+                    <h1 class="text-[38px] md:text-[56px] font-extrabold leading-[1.2] tracking-[-1px] mb-6">댓글 첫 페이지 <span class="bg-gradient-to-br from-primary to-[#8A8DFF] bg-clip-text text-transparent">캐싱</span></h1>
+                    <p class="text-xl text-sub max-w-[760px] mx-auto mb-12 break-keep">
+                        인기 게시글 진입마다 계층형 댓글 트리를 재귀 CTE로 다시 조립하고 있었습니다.<br>
+                        공통 데이터만 캐시하고 개인화 데이터는 조회 시 합성하는 Cache-Aside 구조로 개선했습니다.
+                    </p>
+                </div>
+
+                <div data-fade class="opacity-0 translate-y-[30px] transition-[opacity,transform] duration-[800ms] ease-out motion-reduce:transition-none grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 text-left">
+                    <div class="bg-card border border-line rounded-3xl px-6 py-8 shadow-soft">
+                        <div class="text-sm text-sub mb-2 font-semibold">인기 게시글 댓글 조회</div>
+                        <div class="text-2xl font-bold flex items-baseline gap-2 flex-wrap font-mono">
+                            <span class="text-sub line-through text-lg opacity-70">152ms</span>
+                            <span class="text-line text-base">→</span>
+                            <span class="text-primary text-[32px] tracking-[-1px]">43ms</span>
+                        </div>
+                        <div class="text-[13px] text-sub mt-3 pt-3 border-t border-line">Hot 게시물 기준 -71.7%</div>
+                    </div>
+                    <div class="bg-card border border-line rounded-3xl px-6 py-8 shadow-soft">
+                        <div class="text-sm text-sub mb-2 font-semibold">CTE 실행 횟수 (10분)</div>
+                        <div class="text-2xl font-bold flex items-baseline gap-2 flex-wrap font-mono">
+                            <span class="text-sub line-through text-lg opacity-70">6,642건</span>
+                            <span class="text-line text-base">→</span>
+                            <span class="text-primary text-[32px] tracking-[-1px]">458건</span>
+                        </div>
+                        <div class="text-[13px] text-sub mt-3 pt-3 border-t border-line">재귀 CTE 실행 -93%</div>
+                    </div>
+                    <div class="bg-card border border-line rounded-3xl px-6 py-8 shadow-soft">
+                        <div class="text-sm text-sub mb-2 font-semibold">슬로우 쿼리 총계</div>
+                        <div class="text-2xl font-bold flex items-baseline gap-2 flex-wrap font-mono">
+                            <span class="text-sub line-through text-lg opacity-70">10,119건</span>
+                            <span class="text-line text-base">→</span>
+                            <span class="text-primary text-[32px] tracking-[-1px]">2,468건</span>
+                        </div>
+                        <div class="text-[13px] text-sub mt-3 pt-3 border-t border-line">Slow Query Log 기준 -76%</div>
+                    </div>
+                    <div class="bg-card border border-line rounded-3xl px-6 py-8 shadow-soft">
+                        <div class="text-sm text-sub mb-2 font-semibold">스탬피드 시 CTE</div>
+                        <div class="text-2xl font-bold flex items-baseline gap-2 flex-wrap font-mono">
+                            <span class="text-sub line-through text-lg opacity-70">10~17건</span>
+                            <span class="text-line text-base">→</span>
+                            <span class="text-primary text-[32px] tracking-[-1px]">1건</span>
+                        </div>
+                        <div class="text-[13px] text-sub mt-3 pt-3 border-t border-line">동시 50요청에서도 고정</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. 문제 상황 -->
+        <section id="problem" class="max-w-page mx-auto px-6 pb-[80px]">
+            <div data-fade class="opacity-0 translate-y-[30px] transition-[opacity,transform] duration-[800ms] ease-out motion-reduce:transition-none bg-card border border-line rounded-3xl px-5 py-8 md:p-[60px] shadow-soft">
+                <span class="inline-block px-3.5 py-1.5 bg-primary-light text-primary rounded-[20px] text-sm font-semibold mb-6">STEP 1 · 문제 상황</span>
+                <h2 class="text-[28px] md:text-[36px] font-bold mb-6 leading-[1.3]">같은 댓글 트리를 10분간 6,642번 다시 만들고 있었습니다</h2>
+                <p class="text-base text-sub break-keep mb-8">
+                    게시글 상세 조회 시 댓글 첫 페이지가 함께 내려가는 구조인데, 대댓글을 포함한 트리를 재귀 CTE로 매번 조회했습니다.
+                    Slow Query Log(<code class="font-mono text-[14px] bg-page px-1.5 py-0.5 rounded text-primary">long_query_time=1s + log_queries_not_using_indexes=ON</code>)를 분석하니
+                    JMeter 100 VUser 부하 테스트 10분 동안 동일한 계층형 조회가 6,642회 반복 실행됐고, 인기 게시글 댓글 조회 응답시간은 152ms까지 올라갔습니다.
+                </p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10">
+                    <div>
+                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>반복 실행되던 재귀 CTE</h3>
+                        <pre class="bg-main text-[#E5E7EB] rounded-xl p-5 text-[13px] font-mono overflow-x-auto leading-relaxed">WITH RECURSIVE comment_tree AS (
+    SELECT ..., CAST(LPAD(c.id,10,'0') AS CHAR(1000)) AS path
+    FROM comment c
+    WHERE c.post_id = ? AND c.parent_id IS NULL
+    UNION ALL
+    SELECT ..., CONCAT(ct.path,'-',LPAD(c.id,10,'0'))
+    FROM comment c
+    JOIN comment_tree ct ON c.parent_id = ct.id
+)
+SELECT ... FROM comment_tree
+ORDER BY path LIMIT ? OFFSET ?</pre>
+                        <p class="text-[13px] text-sub mt-4 break-keep">
+                            재귀 단계에서 자식을 반복 JOIN해 트리를 구성하므로, 댓글이 많고 깊을수록 중간 결과 집합이 커지고 동시 요청 시 DB 스레드 경합이 발생합니다.
+                        </p>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>캐시 적용 전 측정치 (10분 구간)</h3>
+                        <div class="bg-page rounded-2xl p-6 mb-6">
+                            <div class="grid gap-3 font-mono text-sm">
+                                <div class="flex justify-between items-center pb-3 border-b border-dashed border-line">
+                                    <span class="font-sans font-medium">CTE 슬로우 쿼리 발생</span>
+                                    <span class="font-bold text-main">6,642건</span>
+                                </div>
+                                <div class="flex justify-between items-center pb-3 border-b border-dashed border-line">
+                                    <span class="font-sans font-medium">평균 실행 시간</span>
+                                    <span class="font-bold text-main">39ms</span>
+                                </div>
+                                <div class="flex justify-between items-center pb-3 border-b border-dashed border-line">
+                                    <span class="font-sans font-medium">P95</span>
+                                    <span class="font-bold text-main">123ms</span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="font-sans font-medium">Max</span>
+                                    <span class="font-bold text-main">269ms</span>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="text-base text-sub break-keep">
+                            테스트 환경: EC2 t2.micro(1vCPU/1GB), 게시글 100만·댓글 1,000만 건, JMeter 100 VUser.
+                            실제 커뮤니티 트래픽을 반영해 <strong class="text-main">읽기 90% / 좋아요 8% / 작성 2%</strong> 비율과
+                            <strong class="text-main">80/20 인기 게시물 집중</strong>(상위 20개 게시물에 80% 트래픽) 시나리오로 구성했습니다.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. 해결 방법 -->
+        <section id="solution" class="max-w-page mx-auto px-6 pb-[80px]">
+            <div data-fade class="opacity-0 translate-y-[30px] transition-[opacity,transform] duration-[800ms] ease-out motion-reduce:transition-none bg-card border border-line rounded-3xl px-5 py-8 md:p-[60px] shadow-soft">
+                <span class="inline-block px-3.5 py-1.5 bg-primary-light text-primary rounded-[20px] text-sm font-semibold mb-6">STEP 2 · 해결 방법</span>
+                <h2 class="text-[28px] md:text-[36px] font-bold mb-6 leading-[1.3]">공통 데이터만 캐시하고, 변동 데이터는 조회 시 합성</h2>
+                <p class="text-base text-sub break-keep mb-8">
+                    핵심은 응답 전체를 무작정 캐시하지 않은 것입니다. 트리 구조처럼 자주 바뀌지 않는 공통 데이터만 캐시하고,
+                    수시로 변하는 <code class="font-mono text-[14px] bg-page px-1.5 py-0.5 rounded text-primary">likeCount</code>와
+                    사용자마다 다른 <code class="font-mono text-[14px] bg-page px-1.5 py-0.5 rounded text-primary">likedByMe</code>는 조회 시점에 IN절 배치 쿼리로 합성합니다.
+                </p>
+
+                <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>캐시 전략 비교</h3>
+                <div class="overflow-x-auto mb-10">
+                    <table class="w-full text-left border-collapse min-w-[560px]">
+                        <thead>
+                            <tr class="bg-page">
+                                <th class="p-3 border border-line text-sm font-semibold">검토 방식</th>
+                                <th class="p-3 border border-line text-sm font-semibold">검토 결과</th>
+                                <th class="p-3 border border-line text-sm font-semibold">판단</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-sm text-sub">
+                            <tr>
+                                <td class="p-3 border border-line font-medium text-main">Write-Through</td>
+                                <td class="p-3 border border-line break-keep">댓글은 몇 초 늦게 보여도 되는 도메인이라 즉시 최신 보장이 불필요. 동시 쓰기 시 느린 재조립이 최신 캐시를 덮어쓰는 정합성 문제도 존재</td>
+                                <td class="p-3 border border-line">기각</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 border border-line font-medium text-main">부분 무효화</td>
+                                <td class="p-3 border border-line break-keep">불변 응답 구조(record)라 일부 노드만 바꿔도 상위 경로 전체를 재생성해야 해 비용 이점이 없음</td>
+                                <td class="p-3 border border-line">기각</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 border border-line font-medium text-primary">Cache-Aside + 조회 시 합성 ✓</td>
+                                <td class="p-3 border border-line break-keep">트리 구조는 모든 사용자에게 동일하고 댓글 생성/삭제 시에만 변해 캐시 효율이 높음. 변동/개인화 데이터는 캐시에서 제외</td>
+                                <td class="p-3 border border-line font-bold text-main">채택</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10 mb-10">
+                    <div>
+                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>조회 흐름</h3>
+                        <pre class="bg-main text-[#E5E7EB] rounded-xl p-5 text-[13px] font-mono overflow-x-auto leading-relaxed">Client → cache.get(postId)
+  ├─ HIT  → 캐시 트리 반환
+  │         + likeCount 합성 (Comment IN절 1회)
+  │         + likedByMe 합성 (likes IN절 1회)
+  └─ MISS → 재귀 CTE 1회 → 캐시 저장 → 합성 → 반환
+
+[댓글 작성/삭제]
+  DB 커밋 완료 → AFTER_COMMIT 이벤트
+              → cache.evict(postId)</pre>
+                        <p class="text-[13px] text-sub mt-4 break-keep">
+                            캐시 히트 시 쿼리 7개 → 5개. 특히 가장 무거운 재귀 CTE·작성자 조회가 사라집니다.
+                        </p>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>무효화 전략</h3>
+                        <div class="overflow-x-auto mb-4">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-page">
+                                        <th class="p-3 border border-line text-sm font-semibold">이벤트</th>
+                                        <th class="p-3 border border-line text-sm font-semibold">무효화</th>
+                                        <th class="p-3 border border-line text-sm font-semibold">이유</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="text-sm text-sub">
+                                    <tr>
+                                        <td class="p-3 border border-line font-medium text-main">댓글 작성/삭제</td>
+                                        <td class="p-3 border border-line">커밋 후 evict</td>
+                                        <td class="p-3 border border-line break-keep">트리 구조 자체가 변경됨</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="p-3 border border-line font-medium text-main">좋아요/싫어요</td>
+                                        <td class="p-3 border border-line font-bold text-primary">evict 없음</td>
+                                        <td class="p-3 border border-line break-keep">likeCount를 캐시에서 제외해 무효화 불필요</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="p-3 border border-line font-medium text-main">TTL 10분</td>
+                                        <td class="p-3 border border-line">자동 만료</td>
+                                        <td class="p-3 border border-line break-keep">방치된 캐시의 최종 안전망</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="text-base text-sub break-keep">
+                            트랜잭션 안에서 바로 evict하면 <strong class="text-main">evict 후 커밋 전 구간</strong>에 다른 스레드가 미커밋 이전 상태를 다시 캐시에 올릴 수 있습니다.
+                            <code class="font-mono text-[14px] bg-page px-1.5 py-0.5 rounded text-primary">@TransactionalEventListener(AFTER_COMMIT)</code>으로 evict 시점을 커밋 완료 이후로 이동했고,
+                            롤백 시에는 이벤트가 발행되지 않아 캐시가 유지됩니다 — 정합성상 올바른 동작입니다.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap gap-2">
+                    <span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">Caffeine (maximumSize=500, TTL 10m)</span>
+                    <span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">Spring Cache Abstraction</span>
+                    <span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">@TransactionalEventListener</span>
+                    <span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">MySQL Recursive CTE</span>
+                    <span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">Slow Query Log</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. 캐시 스탬피드 -->
+        <section id="stampede" class="max-w-page mx-auto px-6 pb-[80px]">
+            <div data-fade class="opacity-0 translate-y-[30px] transition-[opacity,transform] duration-[800ms] ease-out motion-reduce:transition-none bg-card border border-line rounded-3xl px-5 py-8 md:p-[60px] shadow-soft">
+                <span class="inline-block px-3.5 py-1.5 bg-primary-light text-primary rounded-[20px] text-sm font-semibold mb-6">STEP 3 · 추가 발견 문제</span>
+                <h2 class="text-[28px] md:text-[36px] font-bold mb-6 leading-[1.3]">캐시 스탬피드 — evict 직후 CTE가 10~17건 동시 실행</h2>
+                <p class="text-base text-sub break-keep mb-8">
+                    캐시 검증 중 Slow Query Log에서 이상 패턴을 발견했습니다. evict 직후 동시 요청이 몰리면
+                    모든 스레드가 "캐시 없음"을 보고 각자 <code class="font-mono text-[14px] bg-page px-1.5 py-0.5 rounded text-primary">buildCommentPage()</code>를 실행 —
+                    동일 postId의 CTE가 10~17건 동시에 실행됐습니다. <code class="font-mono text-[14px] bg-page px-1.5 py-0.5 rounded text-primary">get → put</code> 두 연산이 분리되어 있기 때문입니다.
+                </p>
+
+                <div class="overflow-x-auto mb-10">
+                    <table class="w-full text-left border-collapse min-w-[560px]">
+                        <thead>
+                            <tr class="bg-page">
+                                <th class="p-3 border border-line text-sm font-semibold">검토 방식</th>
+                                <th class="p-3 border border-line text-sm font-semibold">검토 결과</th>
+                                <th class="p-3 border border-line text-sm font-semibold">판단</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-sm text-sub">
+                            <tr>
+                                <td class="p-3 border border-line font-medium text-main">synchronized 더블 체크</td>
+                                <td class="p-3 border border-line break-keep">인스턴스 단위 락 — postId=1 로딩이 끝날 때까지 postId=2, 3 요청까지 전부 대기. 락 범위가 과도하게 넓음</td>
+                                <td class="p-3 border border-line">기각</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 border border-line font-medium text-main">ConcurrentHashMap per-key 락</td>
+                                <td class="p-3 border border-line break-keep">key 단위로 좁힐 수 있으나 락 객체의 생명주기(생성/제거)를 직접 관리해야 함</td>
+                                <td class="p-3 border border-line">기각</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 border border-line font-medium text-primary">Caffeine cache.get(key, Callable) ✓</td>
+                                <td class="p-3 border border-line break-keep">내부적으로 computeIfAbsent 기반 per-key 원자적 로딩. 락 생명주기를 캐시 엔트리에 맞춰 자동 관리. Redis 전환 시 분산 락으로 교체 예정</td>
+                                <td class="p-3 border border-line font-bold text-main">채택</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 class="text-xl font-bold mb-6 text-center">evict 직후 동시 50요청 — CTE 실행 횟수</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div class="relative border border-line rounded-xl overflow-hidden bg-[#FAFAFA]">
+                        <span class="absolute top-4 left-4 px-3 py-1.5 rounded-lg font-bold text-sm z-10 backdrop-blur-sm bg-white/90 text-main border border-line">BEFORE</span>
+                        <div class="w-full aspect-video bg-[#F1F3F5] flex items-center justify-center relative">
+                            <img src="../images/cache-stampede-before.png" alt="캐시 스탬피드 발생 시 동일 postId CTE 중복 실행 로그" data-zoom class="w-full h-auto aspect-video object-contain block cursor-zoom-in transition-transform duration-300 motion-reduce:transition-none hover:scale-[1.02]" loading="lazy" onerror="this.style.display='none'">
+                        </div>
+                        <p class="p-4 bg-white border-t border-line text-[15px] text-sub leading-normal break-keep">동일 postId CTE가 10~17건 중복 실행 (HikariCP 여유 커넥션 수에 따라 비결정적).</p>
+                    </div>
+                    <div class="relative border border-line rounded-xl overflow-hidden bg-[#FAFAFA]">
+                        <span class="absolute top-4 left-4 px-3 py-1.5 rounded-lg font-bold text-sm z-10 backdrop-blur-sm bg-primary text-white">AFTER</span>
+                        <div class="w-full aspect-video bg-[#F1F3F5] flex items-center justify-center relative">
+                            <img src="../images/cache-stampede-after.png" alt="per-key 원자적 로딩 적용 후 CTE 1건만 실행된 로그" data-zoom class="w-full h-auto aspect-video object-contain block cursor-zoom-in transition-transform duration-300 motion-reduce:transition-none hover:scale-[1.02]" loading="lazy" onerror="this.style.display='none'">
+                        </div>
+                        <p class="p-4 bg-white border-t border-line text-[15px] text-sub leading-normal break-keep">CTE 1건 고정. 나머지 49건은 per-key 락 대기 후 캐시 히트로 처리.</p>
+                    </div>
+                </div>
+                <p class="text-[13px] text-sub break-keep">
+                    * JMeter SyncTimer(groupSize=50)로 50개 요청을 동시 출발시키고, CountDownLatch 기반 동시성 단위 테스트로도 CTE 실행 횟수 1건을 검증했습니다.
+                </p>
+            </div>
+        </section>
+
+        <!-- 5. 결과 -->
+        <section id="result" class="max-w-page mx-auto px-6 pb-[80px]">
+            <div data-fade class="opacity-0 translate-y-[30px] transition-[opacity,transform] duration-[800ms] ease-out motion-reduce:transition-none bg-card border border-line rounded-3xl px-5 py-8 md:p-[60px] shadow-soft">
+                <span class="inline-block px-3.5 py-1.5 bg-primary-light text-primary rounded-[20px] text-sm font-semibold mb-6">STEP 4 · 검증 결과</span>
+                <h2 class="text-[28px] md:text-[36px] font-bold mb-6 leading-[1.3]">가장 무거운 재귀 CTE가 캐시 히트 시 사라졌습니다</h2>
+
+                <div class="overflow-x-auto mb-12">
+                    <table class="w-full text-left border-collapse min-w-[560px]">
+                        <thead>
+                            <tr class="bg-page">
+                                <th class="p-3 border border-line text-sm font-semibold">지표</th>
+                                <th class="p-3 border border-line text-sm font-semibold">캐시 전</th>
+                                <th class="p-3 border border-line text-sm font-semibold">캐시 후</th>
+                                <th class="p-3 border border-line text-sm font-semibold">변화</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-sm font-mono">
+                            <tr>
+                                <td class="p-3 border border-line font-sans font-medium">GET comments (Hot)</td>
+                                <td class="p-3 border border-line text-sub">152ms</td>
+                                <td class="p-3 border border-line font-bold text-primary">43ms</td>
+                                <td class="p-3 border border-line text-secondary font-bold">-71.7%</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 border border-line font-sans font-medium">GET comments (Normal)</td>
+                                <td class="p-3 border border-line text-sub">66ms</td>
+                                <td class="p-3 border border-line font-bold text-primary">40ms</td>
+                                <td class="p-3 border border-line text-secondary font-bold">-39.4%</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 border border-line font-sans font-medium">게시글 상세 (Hot)</td>
+                                <td class="p-3 border border-line text-sub">88ms</td>
+                                <td class="p-3 border border-line font-bold text-primary">52ms</td>
+                                <td class="p-3 border border-line text-secondary font-bold">-40.9%</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 border border-line font-sans font-medium">전체 평균 응답시간</td>
+                                <td class="p-3 border border-line text-sub">260ms</td>
+                                <td class="p-3 border border-line font-bold text-primary">181ms</td>
+                                <td class="p-3 border border-line text-secondary font-bold">-30.4%</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 border border-line font-sans font-medium">CTE 실행 (10분)</td>
+                                <td class="p-3 border border-line text-sub">6,642건</td>
+                                <td class="p-3 border border-line font-bold text-primary">458건</td>
+                                <td class="p-3 border border-line text-secondary font-bold">-93%</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 border border-line font-sans font-medium">슬로우 쿼리 총계</td>
+                                <td class="p-3 border border-line text-sub">10,119건</td>
+                                <td class="p-3 border border-line font-bold text-primary">2,468건</td>
+                                <td class="p-3 border border-line text-secondary font-bold">-76%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 class="text-xl font-bold mb-6 text-center">Slow Query · 캐시 히트율 대시보드</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+                    <div class="relative border border-line rounded-xl overflow-hidden bg-[#FAFAFA]">
+                        <span class="absolute top-4 left-4 px-3 py-1.5 rounded-lg font-bold text-sm z-10 backdrop-blur-sm bg-white/90 text-main border border-line">BEFORE</span>
+                        <div class="w-full aspect-video bg-[#F1F3F5] flex items-center justify-center relative">
+                            <img src="../images/comment-cache-slowquery-before.png" alt="캐시 적용 전 Slow Query 및 캐시 히트율 대시보드" data-zoom class="w-full h-auto aspect-video object-contain block cursor-zoom-in transition-transform duration-300 motion-reduce:transition-none hover:scale-[1.02]" loading="lazy" onerror="this.style.display='none'">
+                        </div>
+                        <p class="p-4 bg-white border-t border-line text-[15px] text-sub leading-normal break-keep">캐시 적용 전 — CTE 슬로우 쿼리가 지속적으로 누적된다.</p>
+                    </div>
+                    <div class="relative border border-line rounded-xl overflow-hidden bg-[#FAFAFA]">
+                        <span class="absolute top-4 left-4 px-3 py-1.5 rounded-lg font-bold text-sm z-10 backdrop-blur-sm bg-primary text-white">AFTER</span>
+                        <div class="w-full aspect-video bg-[#F1F3F5] flex items-center justify-center relative">
+                            <img src="../images/comment-cache-slowquery-after.png" alt="캐시 적용 후 Slow Query 감소 및 캐시 히트율 대시보드" data-zoom class="w-full h-auto aspect-video object-contain block cursor-zoom-in transition-transform duration-300 motion-reduce:transition-none hover:scale-[1.02]" loading="lazy" onerror="this.style.display='none'">
+                        </div>
+                        <p class="p-4 bg-white border-t border-line text-[15px] text-sub leading-normal break-keep">캐시 적용 후 — 슬로우 쿼리가 -76% 감소하고 캐시 히트율(recordStats)이 함께 관측된다.</p>
+                    </div>
+                </div>
+
+                <div class="border-t border-line pt-10">
+                    <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>트레이드오프</h3>
+                    <ul class="text-base text-sub break-keep pl-5 list-disc mb-6">
+                        <li class="mb-2">댓글 작성/삭제마다 eviction이 발생 — 쓰기 비율이 높은 환경에서는 캐시가 채워지기 전에 비워집니다. 읽기 편향(90:10) 커뮤니티 트래픽이라 효과적입니다.</li>
+                        <li class="mb-2">캐시는 JVM 힙에 적재 — 메모리가 부족한 환경에서는 GC 빈도를 높일 수 있어 <code class="font-mono text-[14px] bg-page px-1 rounded">maximumSize=500</code>으로 상한을 제어합니다.</li>
+                        <li class="mb-2">캐시 히트 시에도 likeCount·reaction 합성 쿼리는 항상 실행 — 트래픽이 더 증가하면 이 조회들이 다음 최적화 대상입니다.</li>
+                    </ul>
+                    <p class="text-primary font-semibold break-keep">
+                        "응답 전체를 캐시하는 대신, 안정적인 공통 데이터와 변동·개인화 데이터의 역할을 분리한 것이 이 설계의 핵심입니다."
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 6. CTA -->
+        <section class="max-w-page mx-auto px-6">
+            <div data-fade class="opacity-0 translate-y-[30px] transition-[opacity,transform] duration-[800ms] ease-out motion-reduce:transition-none text-center bg-primary-light rounded-3xl px-6 py-16 mb-[80px]">
+                <h2 class="text-3xl font-bold mb-4 text-primary">다른 문제 해결 사례도 있습니다</h2>
+                <p class="text-lg max-w-[800px] mx-auto text-main break-keep">
+                    동시 좋아요 요청의 유니크 제약 예외를 멱등 처리로 해결한 과정을 이어서 확인할 수 있습니다.
+                </p>
+                <div class="flex flex-col md:flex-row flex-wrap gap-4 justify-center mt-8">
+                    <a href="./like-concurrency.html" class="inline-flex items-center justify-center px-7 py-3.5 rounded-xl font-semibold text-base min-h-[48px] w-full md:w-auto transition duration-300 motion-reduce:transition-none bg-primary text-white hover:bg-primary-dark hover:-translate-y-0.5">다음 사례: 좋아요 동시성 →</a>
+                    <a href="https://velog.io/@chooh1010" target="_blank" class="inline-flex items-center justify-center px-7 py-3.5 rounded-xl font-semibold text-base min-h-[48px] w-full md:w-auto transition duration-300 motion-reduce:transition-none bg-secondary text-white hover:-translate-y-0.5">Velog 전체 분석 글 보기</a>
+                    <a href="../index.html" class="inline-flex items-center justify-center px-7 py-3.5 rounded-xl font-semibold text-base min-h-[48px] w-full md:w-auto transition duration-300 motion-reduce:transition-none bg-transparent text-main border border-line hover:bg-card hover:border-main">← 전체 사례 보기</a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 푸터 -->
+    <footer class="border-t border-line py-[60px] text-center">
+        <div class="max-w-page mx-auto px-6 flex flex-col items-center gap-6">
+            <div class="flex flex-wrap justify-center gap-6">
+                <span class="font-bold text-main">조용현 | Backend Engineer</span>
+                <a href="../index.html" class="text-sub font-medium hover:text-primary">홈</a>
+                <a href="https://github.com/chooh1010" target="_blank" class="text-sub font-medium hover:text-primary">GitHub</a>
+                <a href="https://velog.io/@chooh1010" target="_blank" class="text-sub font-medium hover:text-primary">Velog</a>
+                <a href="mailto:chooh1010@gmail.com" class="text-sub font-medium hover:text-primary">Email</a>
+            </div>
+            <p class="text-sm text-sub">
+                Built with HTML, Tailwind CSS and Vanilla JavaScript.<br>
+                Measured, tested and improved by Cho Yonghyeon.
+            </p>
+        </div>
+    </footer>
+
+    <!-- 이미지 확대 모달 -->
+    <div id="imageModal" class="fixed inset-0 w-full h-full bg-[rgba(17,24,39,0.9)] z-[9999] flex items-center justify-center opacity-0 invisible transition-all duration-300 motion-reduce:transition-none">
+        <div class="relative max-w-[90vw] max-h-[90vh]">
+            <button id="closeModal" class="absolute -top-10 right-0 bg-transparent border-none text-white text-[32px] cursor-pointer">×</button>
+            <img src="" alt="확대된 이미지" class="max-w-full max-h-[90vh] rounded-lg object-contain" id="modalImage">
+        </div>
+    </div>
+
+    <!-- 기능 스크립트 -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // 1. 부드러운 스크롤 (헤더 메뉴 클릭 시)
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    const targetId = this.getAttribute('href');
+                    if (targetId === '#') return;
+
+                    const targetElement = document.querySelector(targetId);
+                    if (targetElement) {
+                        e.preventDefault();
+                        const offsetTop = targetElement.getBoundingClientRect().top + window.scrollY - 80;
+                        window.scrollTo({ top: offsetTop, behavior: 'smooth' });
+                    }
+                });
+            });
+
+            // 2. Intersection Observer를 활용한 스크롤 애니메이션
+            const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            const HIDDEN_CLASSES = ['opacity-0', 'translate-y-[30px]'];
+            const revealElement = (el) => el.classList.remove(...HIDDEN_CLASSES);
+
+            const fadeUpObserver = new IntersectionObserver((entries, observer) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        revealElement(entry.target);
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, { root: null, threshold: 0.1, rootMargin: "0px 0px -50px 0px" });
+
+            document.querySelectorAll('[data-fade]').forEach(el => {
+                if (prefersReducedMotion) {
+                    revealElement(el);
+                } else {
+                    fadeUpObserver.observe(el);
+                }
+            });
+
+            // 3. 이미지 모달 기능
+            const modal = document.getElementById('imageModal');
+            const modalImg = document.getElementById('modalImage');
+            const closeModalBtn = document.getElementById('closeModal');
+            const MODAL_HIDDEN_CLASSES = ['opacity-0', 'invisible'];
+
+            document.querySelectorAll('[data-zoom]').forEach(img => {
+                img.addEventListener('click', (e) => {
+                    if (e.target.style.display === 'none' || !e.target.getAttribute('src')) return;
+                    modalImg.src = e.target.src;
+                    modalImg.alt = e.target.alt;
+                    modal.classList.remove(...MODAL_HIDDEN_CLASSES);
+                    document.body.style.overflow = 'hidden';
+                });
+            });
+
+            const closeModal = () => {
+                modal.classList.add(...MODAL_HIDDEN_CLASSES);
+                document.body.style.overflow = '';
+                setTimeout(() => { modalImg.src = ''; }, 300);
+            };
+
+            closeModalBtn.addEventListener('click', closeModal);
+            modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && !modal.classList.contains('opacity-0')) closeModal();
+            });
+        });
+    </script>
+</body>
+</html>
