@@ -166,10 +166,10 @@
 
                 <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>아키텍처 변경</h3>
                 <pre class="bg-main text-[#E5E7EB] rounded-xl p-5 text-sm font-mono overflow-x-auto leading-relaxed">Before: Client → HAProxy ─┬─ App-1 ─┬─ MySQL (1cpu/1GB, Read+Write)
-                          └─ App-2 ─┘
+                           └─ App-2 ─┘
 
 After:  Client → HAProxy ─┬─ App-1 ─┬─ Master  (1cpu/1GB) ── Write
-                          └─ App-2 ─┤
+                           └─ App-2 ─┤
                                     └─ Replica (1cpu/1GB) ── Read (~90%)
                                             ↑ GTID Replication</pre>
             </div>
