@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="ko" class="scroll-smooth motion-reduce:scroll-auto">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MySQL Read Replica | 조용현 포트폴리오</title>
+    <meta name="description" content="Scale Out 이후 MySQL로 이동한 병목을 Read Replica로 해소. 평균 응답시간 67% 감소, Master CPU 100% → 25%. Replication Lag은 병렬 복제와 Sticky Primary로 완화했습니다.">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="article">
+    <meta property="og:title" content="MySQL Read Replica | 조용현 포트폴리오">
+    <meta property="og:description" content="읽기/쓰기 분리로 평균 응답시간 32ms → 10ms (-67.1%), Master CPU 100% → 25%. Lag은 병렬 복제 + Sticky Primary로 대응.">
+    <meta property="og:url" content="https://chooh1010.github.io/resume/cases/read-replica.html">
+
+    <!-- Favicon (emoji, no external file) -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📈</text></svg>">
+
+    <!-- 폰트 로드: Pretendard(한글), Inter(영문), JetBrains Mono(수치) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css" />
+
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        page: '#F7F8FC',
+                        card: '#FFFFFF',
+                        main: '#111827',
+                        sub: '#667085',
+                        primary: '#5B5FEF',
+                        'primary-dark': '#4A4DD9',
+                        'primary-light': '#EEF0FF',
+                        secondary: '#22B8A7',
+                        line: '#E5E7EB',
+                    },
+                    fontFamily: {
+                        sans: ['Pretendard', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'Roboto', 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', 'sans-serif'],
+                        en: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    boxShadow: {
+                        soft: '0 10px 40px -10px rgba(0,0,0,0.05)',
+                        'soft-hover': '0 15px 40px -10px rgba(91,95,239,0.1)',
+                    },
+                    maxWidth: {
+                        page: '1200px',
+                    },
+                },
+            },
+        };
+    </script>
+</head>
+<body class="bg-page text-main font-sans leading-[1.6] overflow-x-hidden">
+
+    <!-- 헤더 -->
+    <header class="fixed top-0 w-full bg-[rgba(247,248,252,0.8)] backdrop-blur-md z-[100] border-b border-line">
+        <div class="max-w-page mx-auto px-6">
+            <nav class="flex justify-between items-center h-[70px]">
+                <a href="../index.html" class="font-bold text-xl tracking-[-0.5px]">조용현 | I AM</a>
+                <div class="hidden md:flex gap-8">
+                    <a href="../index.html" class="text-[15px] font-medium text-sub transition duration-300 motion-reduce:transition-none hover:text-primary">← 전체 사례</a>
+                    <a href="#problem" class="text-[15px] font-medium text-sub transition duration-300 motion-reduce:transition-none hover:text-primary">문제</a>
+                    <a href="#solution" class="text-[15px] font-medium text-sub transition duration-300 motion-reduce:transition-none hover:text-primary">해결</a>
+                    <a href="#result" class="text-[15px] font-medium text-sub transition duration-300 motion-reduce:transition-none hover:text-primary">결과</a>
+                    <a href="#lag" class="text-[15px] font-medium text-sub transition duration-300 motion-reduce:transition-none hover:text-primary">Replication Lag</a>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <!-- 1. 히어로 -->
+        <section class="pt-[160px] pb-[80px]">
+            <div class="max-w-page mx-auto px-6">
+                <div data-fade class="opacity-0 translate-y-[30px] transition-[opacity,transform] duration-[800ms] ease-out motion-reduce:transition-none text-center">
+                    <span class="inline-block px-3.5 py-1.5 bg-primary-light text-primary rounded-[20px] text-sm font-semibold mb-6">문제 해결 사례 · Popping Community</span>
+                    <h1 class="text-[38px] md:text-[56px] font-extrabold leading-[1.2] tracking-[-1px] mb-6">MySQL <span class="bg-gradient-to-br from-primary to-[#8A8DFF] bg-clip-text text-transparent">Read Replica</span></h1>
+                    <p class="text-xl text-sub max-w-[760px] mx-auto mb-12 break-keep">
+                        Scale Out으로 App 병목을 해소하자 단일 MySQL CPU가 100%에 도달했습니다.<br>
+                        읽기/쓰기 분리로 병목을 해소하고, Replication Lag은 병렬 복제와 Sticky Primary로 대응했습니다.
+                    </p>
+                </div>
+
+                <div data-fade class="opacity-0 translate-y-[30px] transition-[opacity,transform] duration-[800ms] ease-out motion-reduce:transition-none grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 text-left">
+                    <div class="bg-card border border-line rounded-3xl px-6 py-8 shadow-soft">
+                        <div class="text-sm text-sub mb-2 font-semibold">평균 응답시간</div>
+                        <div class="text-2xl font-bold flex items-baseline gap-2 flex-wrap font-mono">
+                            <span class="text-sub line-through text-lg opacity-70">32ms</span>
+                            <span class="text-line text-base">→</span>
+                            <span class="text-primary text-[32px] tracking-[-1px]">10ms</span>
+                        </div>
+                        <div class="text-[13px] text-sub mt-3 pt-3 border-t border-line">읽기 쿼리 분산으로 -67.1%</div>
+                    </div>
+                    <div class="bg-card border border-line rounded-3xl px-6 py-8 shadow-soft">
+                        <div class="text-sm text-sub mb-2 font-semibold">P99 응답시간</div>
+                        <div class="text-2xl font-bold flex items-baseline gap-2 flex-wrap font-mono">
+                            <span class="text-sub line-through text-lg opacity-70">237ms</span>
+                            <span class="text-line text-base">→</span>
+                            <span class="text-primary text-[32px] tracking-[-1px]">80ms</span>
+                        </div>
+                        <div class="text-[13px] text-sub mt-3 pt-3 border-t border-line">Tail Latency -66.2%</div>
+                    </div>
+                    <div class="bg-card border border-line rounded-3xl px-6 py-8 shadow-soft">
+                        <div class="text-sm text-sub mb-2 font-semibold">Master CPU</div>
+                        <div class="text-2xl font-bold flex items-baseline gap-2 flex-wrap font-mono">
+                            <span class="text-sub line-through text-lg opacity-70">100%</span>
+                            <span class="text-line text-base">→</span>
+                            <span class="text-primary text-[32px] tracking-[-1px]">25%</span>
+                        </div>
+                        <div class="text-[13px] text-sub mt-3 pt-3 border-t border-line">Replica가 읽기 부하 ~75% 흡수</div>
+                    </div>
+                    <div class="bg-card border border-line rounded-3xl px-6 py-8 shadow-soft">
+                        <div class="text-sm text-sub mb-2 font-semibold">Replication Lag 평균</div>
+                        <div class="text-2xl font-bold flex items-baseline gap-2 flex-wrap font-mono">
+                            <span class="text-sub line-through text-lg opacity-70">104s</span>
+                            <span class="text-line text-base">→</span>
+                            <span class="text-primary text-[32px] tracking-[-1px]">26s</span>
+                        </div>
+                        <div class="text-[13px] text-sub mt-3 pt-3 border-t border-line">병렬 복제 적용으로 -75%</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. 문제 상황 -->
+        <section id="problem" class="max-w-page mx-auto px-6 pb-[80px]">
+            <div data-fade class="opacity-0 translate-y-[30px] transition-[opacity,transform] duration-[800ms] ease-out motion-reduce:transition-none bg-card border border-line rounded-3xl px-5 py-8 md:p-[60px] shadow-soft">
+                <span class="inline-block px-3.5 py-1.5 bg-primary-light text-primary rounded-[20px] text-sm font-semibold mb-6">STEP 1 · 문제 상황</span>
+                <h2 class="text-[28px] md:text-[36px] font-bold mb-6 leading-[1.3]">병목이 App에서 MySQL로 이동했습니다</h2>
+                <p class="text-base text-sub break-keep mb-8">
+                    커뮤니티 서비스 특성상 읽기 트래픽이 약 90%를 차지하는데, 단일 MySQL(1cpu)이 읽기와 쓰기를 모두 처리하면서 CPU가 포화됐습니다.
+                    읽기 쿼리를 Replica로 분산하면 Master 부하가 줄어 병목을 해소할 수 있다고 판단했습니다.
+                </p>
+
+                <div class="overflow-x-auto mb-8">
+                    <table class="w-full text-left border-collapse min-w-[560px]">
+                        <thead>
+                            <tr class="bg-page">
+                                <th class="p-3 border border-line text-sm font-semibold">단계</th>
+                                <th class="p-3 border border-line text-sm font-semibold">TPS</th>
+                                <th class="p-3 border border-line text-sm font-semibold">Avg 응답시간</th>
+                                <th class="p-3 border border-line text-sm font-semibold">병목</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-sm text-sub font-mono">
+                            <tr>
+                                <td class="p-3 border border-line font-sans">댓글 트리 최적화 후</td>
+                                <td class="p-3 border border-line">274/s</td>
+                                <td class="p-3 border border-line">867ms</td>
+                                <td class="p-3 border border-line font-sans">App CPU</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 border border-line font-sans"><a href="./scale-out.html" class="text-primary hover:underline">Scale Out 후</a></td>
+                                <td class="p-3 border border-line">527/s</td>
+                                <td class="p-3 border border-line">32ms</td>
+                                <td class="p-3 border border-line font-sans font-bold text-main">MySQL CPU ← 현재</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>아키텍처 변경</h3>
+                <pre class="bg-main text-[#E5E7EB] rounded-xl p-5 text-sm font-mono overflow-x-auto leading-relaxed">Before: Client → HAProxy ─┬─ App-1 ─┬─ MySQL (1cpu/1GB, Read+Write)
+                          └─ App-2 ─┘
+
+After:  Client → HAProxy ─┬─ App-1 ─┬─ Master  (1cpu/1GB) ── Write
+                          └─ App-2 ─┤
+                                    └─ Replica (1cpu/1GB) ── Read (~90%)
+                                            ↑ GTID Replication</pre>
+            </div>
+        </section>
+
+        <!-- 3. 해결 방법 -->
+        <section id="solution" class="max-w-page mx-auto px-6 pb-[80px]">
+            <div data-fade class="opacity-0 translate-y-[30px] transition-[opacity,transform] duration-[800ms] ease-out motion-reduce:transition-none bg-card border border-line rounded-3xl px-5 py-8 md:p-[60px] shadow-soft">
+                <span class="inline-block px-3.5 py-1.5 bg-primary-light text-primary rounded-[20px] text-sm font-semibold mb-6">STEP 2 · 해결 방법</span>
+                <h2 class="text-[28px] md:text-[36px] font-bold mb-6 leading-[1.3]">서비스 코드 변경 없는 읽기/쓰기 자동 라우팅</h2>
+                <p class="text-base text-sub break-keep mb-8">
+                    Spring 6.1.2+의 <code class="font-mono text-[14px] bg-page px-1.5 py-0.5 rounded text-primary">LazyConnectionDataSourceProxy</code>를 사용했습니다.
+                    서비스 클래스에 이미 <code class="font-mono text-[14px] bg-page px-1.5 py-0.5 rounded text-primary">@Transactional(readOnly = true)</code>가 올바르게 선언되어 있어,
+                    DataSource 설정만 추가하면 자동으로 라우팅이 동작합니다.
+                </p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10 mb-10">
+                    <div>
+                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>핵심 구현 (~20줄)</h3>
+                        <pre class="bg-main text-[#E5E7EB] rounded-xl p-5 text-[13px] font-mono overflow-x-auto leading-relaxed">@Bean
+@Primary
+public DataSource dataSource(
+        @Qualifier("writeDataSource") DataSource write,
+        @Qualifier("readDataSource") DataSource read) {
+    LazyConnectionDataSourceProxy proxy =
+        new LazyConnectionDataSourceProxy(write);
+    proxy.setReadOnlyDataSource(read);
+    return proxy;
+}
+
+// 서비스 코드는 그대로
+@Transactional(readOnly = true)  // → Replica
+public PostDetailResponse getPost(Long postId) { ... }
+
+public void createPost(PostCreateRequest req) { ... }  // → Master</pre>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>왜 LazyConnectionDataSourceProxy인가</h3>
+                        <div class="overflow-x-auto mb-6">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-page">
+                                        <th class="p-3 border border-line text-sm font-semibold">비교</th>
+                                        <th class="p-3 border border-line text-sm font-semibold">AbstractRouting</th>
+                                        <th class="p-3 border border-line text-sm font-semibold text-primary">LazyConnection ✓</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="text-sm text-sub">
+                                    <tr>
+                                        <td class="p-3 border border-line">커넥션 획득 시점</td>
+                                        <td class="p-3 border border-line">TX 시작 시 (readOnly 미확정)</td>
+                                        <td class="p-3 border border-line font-medium text-main">첫 SQL 실행 시 (readOnly 확정)</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="p-3 border border-line">ThreadLocal / AOP</td>
+                                        <td class="p-3 border border-line">필요</td>
+                                        <td class="p-3 border border-line font-medium text-main">불필요</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="p-3 border border-line">코드량</td>
+                                        <td class="p-3 border border-line">~50줄</td>
+                                        <td class="p-3 border border-line font-medium text-main">~20줄</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="text-base text-sub break-keep mb-4">
+                            커넥션 획득을 첫 SQL 실행까지 지연하므로, 그 시점에는 readOnly 플래그가 확정되어 자연스럽게 올바른 DataSource로 라우팅됩니다.
+                        </p>
+                        <p class="text-[13px] text-sub break-keep">
+                            * <code class="font-mono bg-page px-1 rounded">@ConditionalOnProperty</code>로 Replica가 없는 CI/단일 DB 환경에서는 설정 자체가 로딩되지 않아 기존 구성과 호환됩니다.
+                            GTID 기반 복제를 선택한 이유는 Docker 컨테이너 재시작 시에도 binlog 포지션을 자동 추적하기 때문입니다.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap gap-2">
+                    <span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">MySQL GTID Replication</span>
+                    <span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">LazyConnectionDataSourceProxy</span>
+                    <span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">Spring Data JPA</span>
+                    <span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">HikariCP (Write 50 / Read 80)</span>
+                    <span class="bg-[#F1F3F5] text-[#495057] px-2.5 py-1 rounded-md text-[13px] font-medium">Grafana</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. 결과 -->
+        <section id="result" class="max-w-page mx-auto px-6 pb-[80px]">
+            <div data-fade class="opacity-0 translate-y-[30px] transition-[opacity,transform] duration-[800ms] ease-out motion-reduce:transition-none bg-card border border-line rounded-3xl px-5 py-8 md:p-[60px] shadow-soft">
+                <span class="inline-block px-3.5 py-1.5 bg-primary-light text-primary rounded-[20px] text-sm font-semibold mb-6">STEP 3 · 검증 결과</span>
+                <h2 class="text-[28px] md:text-[36px] font-bold mb-6 leading-[1.3]">모든 읽기 엔드포인트에서 66~72% 응답시간 감소</h2>
+                <p class="text-base text-sub break-keep mb-8">
+                    동일 조건(500 VUser, 10분, 읽기 90% + 쓰기 10% 워크로드)으로 부하테스트를 재실행했습니다.
+                    쓰기 경로도 Master의 읽기 경합이 사라지면서 간접적으로 개선됐습니다 — 게스트 글쓰기 179ms → 110ms(-39%), 댓글 좋아요 52ms → 15ms(-71%).
+                </p>
+
+                <div class="overflow-x-auto mb-12">
+                    <table class="w-full text-left border-collapse min-w-[560px]">
+                        <thead>
+                            <tr class="bg-page">
+                                <th class="p-3 border border-line text-sm font-semibold">지표</th>
+                                <th class="p-3 border border-line text-sm font-semibold">Before (단일 MySQL)</th>
+                                <th class="p-3 border border-line text-sm font-semibold">After (+ Replica)</th>
+                                <th class="p-3 border border-line text-sm font-semibold">변화</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-sm font-mono">
+                            <tr>
+                                <td class="p-3 border border-line font-sans font-medium">평균 응답시간</td>
+                                <td class="p-3 border border-line text-sub">32ms</td>
+                                <td class="p-3 border border-line font-bold text-primary">10ms</td>
+                                <td class="p-3 border border-line text-secondary font-bold">-67.1%</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 border border-line font-sans font-medium">P50 / P95</td>
+                                <td class="p-3 border border-line text-sub">27ms / 125ms</td>
+                                <td class="p-3 border border-line font-bold text-primary">7ms / 36ms</td>
+                                <td class="p-3 border border-line text-secondary font-bold">-74.1% / -71.2%</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 border border-line font-sans font-medium">P99 응답시간</td>
+                                <td class="p-3 border border-line text-sub">237ms</td>
+                                <td class="p-3 border border-line font-bold text-primary">80ms</td>
+                                <td class="p-3 border border-line text-secondary font-bold">-66.2%</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 border border-line font-sans font-medium">최대 응답시간</td>
+                                <td class="p-3 border border-line text-sub">1,338ms</td>
+                                <td class="p-3 border border-line font-bold text-primary">469ms</td>
+                                <td class="p-3 border border-line text-secondary font-bold">-64.9%</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 border border-line font-sans font-medium">Master CPU</td>
+                                <td class="p-3 border border-line text-sub">약 100%</td>
+                                <td class="p-3 border border-line font-bold text-primary">약 25%</td>
+                                <td class="p-3 border border-line text-secondary font-bold">Replica가 ~75% 흡수</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 border border-line font-sans font-medium">TPS</td>
+                                <td class="p-3 border border-line text-sub">527.0/s</td>
+                                <td class="p-3 border border-line font-bold text-primary">538.9/s</td>
+                                <td class="p-3 border border-line text-sub">+2.3%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-[13px] text-sub break-keep mb-12">
+                    * TPS가 소폭 상승에 그친 이유: JMeter 시나리오가 Think Time과 고정 스레드 수(500)로 구성되어, 응답이 빨라져도 다음 요청까지 대기가 있기 때문입니다.
+                    따라서 이번 개선의 핵심 지표는 응답시간과 Master 부하 감소입니다.
+                </p>
+
+                <h3 class="text-xl font-bold mb-6 text-center">DB CPU 사용률 변화</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+                    <div class="relative border border-line rounded-xl overflow-hidden bg-[#FAFAFA]">
+                        <span class="absolute top-4 left-4 px-3 py-1.5 rounded-lg font-bold text-sm z-10 backdrop-blur-sm bg-white/90 text-main border border-line">BEFORE</span>
+                        <div class="w-full aspect-video bg-[#F1F3F5] flex items-center justify-center relative">
+                            <img src="../images/replica-cpu-before.png" alt="Read Replica 적용 전 단일 MySQL CPU 포화 그래프" data-zoom class="w-full h-auto aspect-video object-contain block cursor-zoom-in transition-transform duration-300 motion-reduce:transition-none hover:scale-[1.02]" onerror="this.style.display='none'">
+                        </div>
+                        <p class="p-4 bg-white border-t border-line text-[15px] text-sub leading-normal break-keep">단일 MySQL이 100%에 고정되어 포화 상태. DB가 병목이라 App CPU가 노는 구간도 보인다.</p>
+                    </div>
+                    <div class="relative border border-line rounded-xl overflow-hidden bg-[#FAFAFA]">
+                        <span class="absolute top-4 left-4 px-3 py-1.5 rounded-lg font-bold text-sm z-10 backdrop-blur-sm bg-primary text-white">AFTER</span>
+                        <div class="w-full aspect-video bg-[#F1F3F5] flex items-center justify-center relative">
+                            <img src="../images/replica-cpu-after.png" alt="Read Replica 적용 후 Master DB 부하 감소 그래프" data-zoom class="w-full h-auto aspect-video object-contain block cursor-zoom-in transition-transform duration-300 motion-reduce:transition-none hover:scale-[1.02]" onerror="this.style.display='none'">
+                        </div>
+                        <p class="p-4 bg-white border-t border-line text-[15px] text-sub leading-normal break-keep">Master가 ~25%로 낮아지고 Replica가 ~75%로 읽기 부하를 흡수. App CPU도 더 균일하게 활용된다.</p>
+                    </div>
+                </div>
+
+                <h3 class="text-xl font-bold mb-6 text-center mt-14">응답시간(Tail Latency) 변화</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-2">
+                    <div class="relative border border-line rounded-xl overflow-hidden bg-[#FAFAFA]">
+                        <span class="absolute top-4 left-4 px-3 py-1.5 rounded-lg font-bold text-sm z-10 backdrop-blur-sm bg-white/90 text-main border border-line">BEFORE</span>
+                        <div class="w-full aspect-video bg-[#F1F3F5] flex items-center justify-center relative">
+                            <img src="../images/replica-response-before.png" alt="Read Replica 적용 전 Tail Latency 증가 그래프" data-zoom class="w-full h-auto aspect-video object-contain block cursor-zoom-in transition-transform duration-300 motion-reduce:transition-none hover:scale-[1.02]" loading="lazy" onerror="this.style.display='none'">
+                        </div>
+                        <p class="p-4 bg-white border-t border-line text-[15px] text-sub leading-normal break-keep">P99가 100~350ms 범위에서 출렁이고 P95도 간헐적 스파이크. 읽기/쓰기 쿼리 경합으로 불안정하다.</p>
+                    </div>
+                    <div class="relative border border-line rounded-xl overflow-hidden bg-[#FAFAFA]">
+                        <span class="absolute top-4 left-4 px-3 py-1.5 rounded-lg font-bold text-sm z-10 backdrop-blur-sm bg-primary text-white">AFTER</span>
+                        <div class="w-full aspect-video bg-[#F1F3F5] flex items-center justify-center relative">
+                            <img src="../images/replica-response-after.png" alt="Read Replica 적용 후 응답시간 감소 그래프" data-zoom class="w-full h-auto aspect-video object-contain block cursor-zoom-in transition-transform duration-300 motion-reduce:transition-none hover:scale-[1.02]" loading="lazy" onerror="this.style.display='none'">
+                        </div>
+                        <p class="p-4 bg-white border-t border-line text-[15px] text-sub leading-normal break-keep">P99가 20~80ms로 안정화되고 P50은 7ms를 일정하게 유지. 쿼리 큐잉이 해소된 결과다.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. Replication Lag 대응 -->
+        <section id="lag" class="max-w-page mx-auto px-6 pb-[80px]">
+            <div data-fade class="opacity-0 translate-y-[30px] transition-[opacity,transform] duration-[800ms] ease-out motion-reduce:transition-none bg-card border border-line rounded-3xl px-5 py-8 md:p-[60px] shadow-soft">
+                <span class="inline-block px-3.5 py-1.5 bg-primary-light text-primary rounded-[20px] text-sm font-semibold mb-6">STEP 4 · 트레이드오프 대응</span>
+                <h2 class="text-[28px] md:text-[36px] font-bold mb-6 leading-[1.3]">Replication Lag — "내가 쓴 글이 안 보여요"</h2>
+                <p class="text-base text-sub break-keep mb-8">
+                    부하테스트 중 Replication Lag이 평균 104초, 최대 348초까지 발생했습니다.
+                    커뮤니티 특성상 다른 사람의 글이 수 초 늦게 보이는 것은 허용되지만, <strong class="text-main">사용자가 방금 쓴 자신의 글이 보이지 않는 것은 버그처럼 느껴집니다</strong> (Read-your-own-writes 문제).
+                    두 가지 전략으로 대응했습니다.
+                </p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10 mb-10">
+                    <div>
+                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>전략 1 — 병렬 복제 (Lag 자체를 줄임)</h3>
+                        <p class="text-base text-sub break-keep mb-4">
+                            Replica의 SQL Thread는 기본적으로 단일 스레드로 binlog를 재생합니다.
+                            <code class="font-mono text-[14px] bg-page px-1.5 py-0.5 rounded text-primary">LOGICAL_CLOCK</code> 방식은 Master에서 같은 group commit에 포함된(서로 충돌하지 않는) 트랜잭션을 Replica에서도 병렬로 적용합니다.
+                        </p>
+                        <pre class="bg-main text-[#E5E7EB] rounded-xl p-5 text-[13px] font-mono overflow-x-auto leading-relaxed">mysql-replica:
+  command:
+    - "--replica-parallel-workers=2"
+    - "--replica-parallel-type=LOGICAL_CLOCK"</pre>
+                        <p class="text-[13px] text-sub mt-4 break-keep">코드 변경 없이 MySQL 설정만으로 Lag 평균 -75%, 최대 -49%.</p>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>전략 2 — Sticky Primary (정합성 보장)</h3>
+                        <p class="text-base text-sub break-keep mb-4">
+                            쓰기 트랜잭션이 <strong class="text-main">커밋되면</strong> 3초 TTL의 <code class="font-mono text-[14px] bg-page px-1.5 py-0.5 rounded text-primary">STICKY_PRIMARY</code> 쿠키를 발급합니다.
+                            이후 3초간 해당 사용자의 읽기만 Master로 라우팅되어, 방금 쓴 데이터를 즉시 읽을 수 있습니다.
+                        </p>
+                        <pre class="bg-main text-[#E5E7EB] rounded-xl p-5 text-[13px] font-mono overflow-x-auto leading-relaxed">Request → StickyPrimaryFilter (Cookie → ThreadLocal)
+  → LazyConnectionDataSourceProxy
+      ├─ @Transactional            → Master (항상)
+      └─ @Transactional(readOnly)
+            ├─ sticky=true  → Master (3초간)
+            └─ sticky=false → Replica (평상시)
+  → StickyPrimaryAspect (afterCommit → Cookie 발급)</pre>
+                        <p class="text-[13px] text-sub mt-4 break-keep">
+                            Cookie 방식(vs HttpSession)이라 비로그인 게스트에게도 동작하고 세션 스토어 없이 Scale Out과 호환됩니다.
+                            쿠키 발급은 AOP <code class="font-mono bg-page px-1 rounded">afterCommit</code> 콜백으로, 롤백 시에는 발급되지 않습니다.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto mb-12">
+                    <table class="w-full text-left border-collapse min-w-[560px]">
+                        <thead>
+                            <tr class="bg-page">
+                                <th class="p-3 border border-line text-sm font-semibold">지표</th>
+                                <th class="p-3 border border-line text-sm font-semibold">Before (workers=1)</th>
+                                <th class="p-3 border border-line text-sm font-semibold">After (병렬 복제 + Sticky Primary)</th>
+                                <th class="p-3 border border-line text-sm font-semibold">변화</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-sm font-mono">
+                            <tr>
+                                <td class="p-3 border border-line font-sans font-medium">Lag 평균</td>
+                                <td class="p-3 border border-line text-sub">104s</td>
+                                <td class="p-3 border border-line font-bold text-primary">26s</td>
+                                <td class="p-3 border border-line text-secondary font-bold">-75%</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 border border-line font-sans font-medium">Lag 최대</td>
+                                <td class="p-3 border border-line text-sub">348s</td>
+                                <td class="p-3 border border-line font-bold text-primary">177s</td>
+                                <td class="p-3 border border-line text-secondary font-bold">-49%</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 border border-line font-sans font-medium">복구 시간</td>
+                                <td class="p-3 border border-line text-sub">~2.75분</td>
+                                <td class="p-3 border border-line font-bold text-primary">~1.5분</td>
+                                <td class="p-3 border border-line text-secondary font-bold">-45%</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 border border-line font-sans font-medium">P95 / P99 (750 VUser)</td>
+                                <td class="p-3 border border-line text-sub">830ms / 1,241ms</td>
+                                <td class="p-3 border border-line font-bold text-primary">747ms / 1,168ms</td>
+                                <td class="p-3 border border-line text-secondary font-bold">-10% / -5.9%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <p class="text-[13px] text-sub break-keep mb-12">
+                    * Lag 검증 테스트는 Lag을 더 크게 유발하기 위해 750 VUser(다른 지표는 500 VUser)로 실행했습니다.
+                </p>
+
+                <h3 class="text-xl font-bold mb-6 text-center">Replication Lag 변화</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+                    <div class="relative border border-line rounded-xl overflow-hidden bg-[#FAFAFA]">
+                        <span class="absolute top-4 left-4 px-3 py-1.5 rounded-lg font-bold text-sm z-10 backdrop-blur-sm bg-white/90 text-main border border-line">BEFORE</span>
+                        <div class="w-full aspect-video bg-[#F1F3F5] flex items-center justify-center relative">
+                            <img src="../images/replica-lag-before.png" alt="병렬 복제 적용 전 Replication Lag 최대 348초 그래프" data-zoom class="w-full h-auto aspect-video object-contain block cursor-zoom-in transition-transform duration-300 motion-reduce:transition-none hover:scale-[1.02]" loading="lazy" onerror="this.style.display='none'">
+                        </div>
+                        <p class="p-4 bg-white border-t border-line text-[15px] text-sub leading-normal break-keep">단일 SQL Thread(workers=1)의 순차 처리로 Lag이 최대 348초까지 상승. 종료 후 복구까지 약 2.75분.</p>
+                    </div>
+                    <div class="relative border border-line rounded-xl overflow-hidden bg-[#FAFAFA]">
+                        <span class="absolute top-4 left-4 px-3 py-1.5 rounded-lg font-bold text-sm z-10 backdrop-blur-sm bg-primary text-white">AFTER</span>
+                        <div class="w-full aspect-video bg-[#F1F3F5] flex items-center justify-center relative">
+                            <img src="../images/replica-lag-after.png" alt="병렬 복제 적용 후 Replication Lag 절반 수준 그래프" data-zoom class="w-full h-auto aspect-video object-contain block cursor-zoom-in transition-transform duration-300 motion-reduce:transition-none hover:scale-[1.02]" loading="lazy" onerror="this.style.display='none'">
+                        </div>
+                        <p class="p-4 bg-white border-t border-line text-[15px] text-sub leading-normal break-keep">병렬 복제(workers=2)로 binlog replay가 빨라져 최대 177초로 절반 수준. 복구도 약 1.5분으로 단축.</p>
+                    </div>
+                </div>
+
+                <div class="border-t border-line pt-10">
+                    <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>왜 이 조합인가 — 커뮤니티 서비스의 비대칭적 일관성 요구</h3>
+                    <p class="text-base text-sub break-keep mb-4">
+                        커뮤니티 포럼은 결제 시스템과 달리 전체 정합성은 Eventual로 충분하지만, <strong class="text-main">자기 자신의 쓰기에 대해서만은 즉시 일관성</strong>이 필요합니다.
+                        Semi-sync Replication은 모든 쓰기에 Replica ACK 대기를 강제해 과하고, 전체 Master 라우팅은 Replica 도입을 무의미하게 만듭니다.
+                    </p>
+                    <p class="text-primary font-semibold break-keep">
+                        "전체 시스템에 일관성 비용을 부과하지 않으면서, '내 글이 안 보이는' 문제만 정확히 해결합니다 — 코드 4개 파일 추가로."
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 6. CTA -->
+        <section class="max-w-page mx-auto px-6">
+            <div data-fade class="opacity-0 translate-y-[30px] transition-[opacity,transform] duration-[800ms] ease-out motion-reduce:transition-none text-center bg-primary-light rounded-3xl px-6 py-16 mb-[80px]">
+                <h2 class="text-3xl font-bold mb-4 text-primary">전체 분석 과정이 궁금한가요?</h2>
+                <p class="text-lg max-w-[800px] mx-auto text-main break-keep">
+                    테스트 환경 구성, GTID Replication 설정, Sticky Primary 구현 세부사항을 Velog에 기록했습니다.
+                </p>
+                <div class="flex flex-col md:flex-row flex-wrap gap-4 justify-center mt-8">
+                    <a href="https://velog.io/@chooh1010/MySQL-Read-Replica-도입" target="_blank" class="inline-flex items-center justify-center px-7 py-3.5 rounded-xl font-semibold text-base min-h-[48px] w-full md:w-auto transition duration-300 motion-reduce:transition-none bg-primary text-white hover:bg-primary-dark hover:-translate-y-0.5">Velog 전체 분석 글 보기</a>
+                    <a href="./scale-out.html" class="inline-flex items-center justify-center px-7 py-3.5 rounded-xl font-semibold text-base min-h-[48px] w-full md:w-auto transition duration-300 motion-reduce:transition-none bg-secondary text-white hover:-translate-y-0.5">← 이전 사례: Scale Out</a>
+                    <a href="../index.html" class="inline-flex items-center justify-center px-7 py-3.5 rounded-xl font-semibold text-base min-h-[48px] w-full md:w-auto transition duration-300 motion-reduce:transition-none bg-transparent text-main border border-line hover:bg-card hover:border-main">전체 사례 보기</a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 푸터 -->
+    <footer class="border-t border-line py-[60px] text-center">
+        <div class="max-w-page mx-auto px-6 flex flex-col items-center gap-6">
+            <div class="flex flex-wrap justify-center gap-6">
+                <span class="font-bold text-main">조용현 | Backend Engineer</span>
+                <a href="../index.html" class="text-sub font-medium hover:text-primary">홈</a>
+                <a href="https://github.com/chooh1010" target="_blank" class="text-sub font-medium hover:text-primary">GitHub</a>
+                <a href="https://velog.io/@chooh1010" target="_blank" class="text-sub font-medium hover:text-primary">Velog</a>
+                <a href="mailto:chooh1010@gmail.com" class="text-sub font-medium hover:text-primary">Email</a>
+            </div>
+            <p class="text-sm text-sub">
+                Built with HTML, Tailwind CSS and Vanilla JavaScript.<br>
+                Measured, tested and improved by Cho Yonghyeon.
+            </p>
+        </div>
+    </footer>
+
+    <!-- 이미지 확대 모달 -->
+    <div id="imageModal" class="fixed inset-0 w-full h-full bg-[rgba(17,24,39,0.9)] z-[9999] flex items-center justify-center opacity-0 invisible transition-all duration-300 motion-reduce:transition-none">
+        <div class="relative max-w-[90vw] max-h-[90vh]">
+            <button id="closeModal" class="absolute -top-10 right-0 bg-transparent border-none text-white text-[32px] cursor-pointer">×</button>
+            <img src="" alt="확대된 이미지" class="max-w-full max-h-[90vh] rounded-lg object-contain" id="modalImage">
+        </div>
+    </div>
+
+    <!-- 기능 스크립트 -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // 1. 부드러운 스크롤 (헤더 메뉴 클릭 시)
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    const targetId = this.getAttribute('href');
+                    if (targetId === '#') return;
+
+                    const targetElement = document.querySelector(targetId);
+                    if (targetElement) {
+                        e.preventDefault();
+                        const offsetTop = targetElement.getBoundingClientRect().top + window.scrollY - 80;
+                        window.scrollTo({ top: offsetTop, behavior: 'smooth' });
+                    }
+                });
+            });
+
+            // 2. Intersection Observer를 활용한 스크롤 애니메이션
+            const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            const HIDDEN_CLASSES = ['opacity-0', 'translate-y-[30px]'];
+            const revealElement = (el) => el.classList.remove(...HIDDEN_CLASSES);
+
+            const fadeUpObserver = new IntersectionObserver((entries, observer) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        revealElement(entry.target);
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, { root: null, threshold: 0.1, rootMargin: "0px 0px -50px 0px" });
+
+            document.querySelectorAll('[data-fade]').forEach(el => {
+                if (prefersReducedMotion) {
+                    revealElement(el);
+                } else {
+                    fadeUpObserver.observe(el);
+                }
+            });
+
+            // 3. 이미지 모달 기능
+            const modal = document.getElementById('imageModal');
+            const modalImg = document.getElementById('modalImage');
+            const closeModalBtn = document.getElementById('closeModal');
+            const MODAL_HIDDEN_CLASSES = ['opacity-0', 'invisible'];
+
+            document.querySelectorAll('[data-zoom]').forEach(img => {
+                img.addEventListener('click', (e) => {
+                    if (e.target.style.display === 'none' || !e.target.getAttribute('src')) return;
+                    modalImg.src = e.target.src;
+                    modalImg.alt = e.target.alt;
+                    modal.classList.remove(...MODAL_HIDDEN_CLASSES);
+                    document.body.style.overflow = 'hidden';
+                });
+            });
+
+            const closeModal = () => {
+                modal.classList.add(...MODAL_HIDDEN_CLASSES);
+                document.body.style.overflow = '';
+                setTimeout(() => { modalImg.src = ''; }, 300);
+            };
+
+            closeModalBtn.addEventListener('click', closeModal);
+            modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && !modal.classList.contains('opacity-0')) closeModal();
+            });
+        });
+    </script>
+</body>
+</html>
