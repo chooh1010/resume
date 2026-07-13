@@ -381,7 +381,7 @@ public void createPost(PostCreateRequest req) { ... }  // → Master</pre>
   command:
     - "--replica-parallel-workers=2"
     - "--replica-parallel-type=LOGICAL_CLOCK"</pre>
-                        <p class="text-[13px] text-sub mt-4 break-keep">코드 변경 없이 MySQL 설정만으로 Lag 평균 -75%, 최대 -49%.</p>
+                        <p class="text-[13px] text-sub mt-4 break-keep">병렬 복제 + Sticky Primary 결합 검증에서 Lag 평균 104초 → 26초(-75%), 최대 348초 → 177초(-49%). Lag 감소는 병렬 복제로, 쓰기 직후 정합성은 Sticky Primary로 보완했습니다.</p>
                     </div>
                     <div>
                         <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>전략 2 — Sticky Primary (정합성 보장)</h3>
