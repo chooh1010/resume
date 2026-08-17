@@ -556,7 +556,7 @@ Prometheus &rarr; Grafana (모니터링)</div>
   </tr>
   <tr>
     <td><b>Spring Session<br>Redis</b></td>
-    <td>세션만이 아니라 캐시 무효화(Pub/Sub)&middot;WebSocket 브로커 relay까지 <b>같은 인프라로 확장</b> 가능. 요청당 추가 비용은 HGETALL 1회 0.004ms로 실측</td>
+    <td>세션만이 아니라 캐시 무효화(Pub/Sub)&middot;WebSocket 브로드캐스트의 인스턴스 간 복제까지 <b>같은 인프라로 확장</b> 가능. 요청당 추가 비용은 HGETALL 1회 0.004ms로 실측</td>
     <td><span class="tag-accept">채택</span></td>
   </tr>
 </table>
@@ -565,7 +565,7 @@ Prometheus &rarr; Grafana (모니터링)</div>
 <div class="step step-action">Action</div>
 <img class="arch" src="images/arch-redis-target.png" alt="Redis 도입 후 구조: 요청은 HAProxy에서 앱으로 그대로 가고, 앱이 Redis에서 세션을 읽는다. sticky 쿠키 제거">
 <ul>
-  <li>의존성을 올리는 것만으로 모든 환경의 세션이 Redis로 전환되는 문제를 확인 &mdash; Redis가 없는 운영 EC2에서 "앱은 뜨는데 로그인만 깨지는" 장애를 막기 위해 커밋되는 설정에 <code>spring.session.store-type: none</code> 안전 기본값을 두고, 리그에서만 환경변수로 opt-in</li>
+  <li>의존성을 올리는 것만으로 모든 환경의 세션이 Redis로 전환되는 문제를 확인 &mdash; Redis가 없으면 "앱은 뜨는데 세션을 쓰는 요청만 500"이 된다. 처음 넣은 <code>spring.session.store-type: none</code> 안전 기본값은 <b>검증해보니 작동하지 않았다</b>: Boot 3.x에서 제거된 속성이라 무시되고 클래스패스만으로 전환된다. <code>SessionAutoConfiguration</code>을 배제하고 <code>app.session.store=redis</code>일 때만 켜지도록 다시 만들어, opt-in 없이 Redis를 내려도 로그인이 정상 동작함을 확인(500 &rarr; 302)</li>
   <li>Redis는 <code>maxmemory 192mb</code> + <code>noeviction</code> &mdash; 세션 저장소에서 축출은 "사용자가 조용히 로그아웃되는" 장애이므로, 메모리 압박 시 쓰기 거부가 낫다고 판단</li>
   <li>HAProxy에서 <code>cookie SERVERID insert</code> 제거 &rarr; 요청 단위 round robin 복원</li>
   <li><b>이전 과정에서 발견 1:</b> 세션을 열어보니 BCrypt 해시가 실려 있었음(DB 해시 조각과 대조로 확인). <code>CredentialsContainer</code>로 인증 직후 소거 &mdash; 인증 토큰에서 principal까지 소거가 연쇄되는지를 테스트로 고정 (세션 내 해시 검출 1 &rarr; 0건)</li>
@@ -583,7 +583,7 @@ Prometheus &rarr; Grafana (모니터링)</div>
     <tr><td class="label">검증 부하테스트 에러율</td><td class="before">&mdash;</td><td class="arrow">&rarr;</td><td class="after">0% (235,103 샘플)</td></tr>
   </table>
 </div>
-<div class="note">JMeter 750 VUser, 10분, 로컬 Docker 리그. Redis 부하 초당 550 명령으로 한계 대비 여유. 캐시 무효화 Pub/Sub&middot;STOMP relay는 다음 단계</div>
+<div class="note">JMeter 750 VUser, 10분, 로컬 Docker 리그. Redis 부하 초당 550 명령으로 한계 대비 여유. 캐시 무효화 Pub/Sub&middot;WebSocket 브로드캐스트 복제는 다음 단계</div>
 
 <!-- ============================================ -->
 <!-- PoppingOps -->
