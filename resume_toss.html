@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>조용현 - 이력서 (토스뱅크 지원용)</title>
+<style>
+  body {
+    font-family: 'Pretendard', 'Noto Sans KR', Arial, sans-serif;
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 36px 48px;
+    color: #222;
+    font-size: 10.5pt;
+    line-height: 1.55;
+  }
+  h1 { font-size: 22pt; margin: 0 0 2px 0; border-bottom: 2px solid #333; padding-bottom: 6px; }
+  h1 span { font-size: 12pt; font-weight: 400; color: #555; margin-left: 8px; }
+  .contacts { font-size: 9.5pt; color: #555; margin: 4px 0 14px 0; }
+  .contacts a { color: #555; text-decoration: none; }
+  h2 { font-size: 11.5pt; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 3px; margin: 14px 0 6px 0; }
+  .tags span { display: inline-block; background: #f0f0f0; border-radius: 3px; padding: 1px 7px; margin: 2px 3px 2px 0; font-size: 9pt; }
+  .pj-title { font-weight: 700; font-size: 10.5pt; margin: 8px 0 1px 0; }
+  .pj-meta { font-size: 8.5pt; color: #666; margin: 0 0 4px 0; }
+  ul { margin: 1px 0 4px 0; padding-left: 16px; }
+  li { margin-bottom: 3px; font-size: 9pt; line-height: 1.5; }
+  .blue { font-weight: 700; color: #1a73e8; }
+  .edu { margin: 4px 0; }
+  @media print {
+    .avoid-break {
+      break-inside: avoid-page;
+      page-break-inside: avoid;
+    }
+  }
+</style>
+</head>
+<body>
+
+<h1>조용현 <span>Backend Engineer &middot; 신입</span></h1>
+<div class="contacts">
+  <a href="mailto:chooh1010@gmail.com">chooh1010@gmail.com</a> &middot;
+  <a href="https://github.com/chooh1010">github.com/chooh1010</a> &middot;
+  <a href="https://velog.io/@chooh1010/posts">velog.io/@chooh1010</a> &middot;
+  <a href="https://chooh1010.github.io/resume/portfolio_toss.html">Portfolio</a>
+</div>
+
+<h2>보유 역량 요약</h2>
+<p style="font-size:9.5pt; margin:0 0 4px 0;">대용량 데이터 환경에서 문제를 재현하고, 데이터 접근 구조와 동시 요청 처리 방식을 개선해 성능과 안정성을 높여 온 백엔드 엔지니어</p>
+<ul>
+  <li>서비스 성장 시 발생할 수 있는 병목을 사전 검증하기 위해 게시글 100만 건, 댓글 1,000만 건, 좋아요 450만 건을 적재한 환경에서 병목을 수치로 확인하고 개선 효과까지 검증한 경험</li>
+  <li>단순히 성능을 개선하는 데 그치지 않고, 문제의 원인과 서비스 운영상 영향까지 분석해 해결 방식을 선택한 경험</li>
+  <li>동일 조건 부하테스트가 57%까지 흔들리는 재현성 문제를 워밍업 통제&middot;정상상태 판정 프로토콜로 해결하고, 분산 환경에서 깨지는 지점을 실패 주입으로 직접 실증한 경험</li>
+  <li>배포 자동화, 문서 자동화, 모니터링과 장애 알림까지 직접 구성해 개발과 운영이 이어지는 흐름을 경험</li>
+
+</ul>
+
+<h2>기술 스택</h2>
+<div class="tags">
+  <span>Java</span>
+  <span>Spring Boot</span>
+  <span>Spring Data JPA</span>
+  <span>MySQL</span>
+  <span>Redis</span>
+  <span>Caffeine Cache</span>
+  <span>HAProxy</span>
+  <span>AWS EC2</span>
+  <span>Docker</span>
+  <span>GitHub Actions</span>
+  <span>JMeter</span>
+  <span>Prometheus</span>
+  <span>Grafana</span>
+  <span>Railway</span>
+  <span>Bash</span>
+  <span>Spring REST Docs</span>
+</div>
+
+<h2>Projects</h2>
+
+<div class="pj-title">Popping-community &mdash; 커뮤니티 서비스 (2025.03 ~ 현재) <a href="https://github.com/Popping-community/Popping-Server" style="color:#1a73e8; font-size:9pt;">GitHub</a></div>
+<div class="pj-meta">개인 프로젝트 &middot; EC2 실 배포 + 로컬 Docker 리그(HAProxy &middot; App&times;2 &middot; MySQL Primary/Replica &middot; Redis) &middot; 게시글 100만 &middot; 댓글 최대 1,000만 &middot; 좋아요 최대 735만 건 &middot; JMeter 100~750 VUser</div>
+
+<ul>
+  <li>인기 게시글 댓글 트리 반복 생성으로 응답 지연 발생, 인메모리 캐시(Caffeine) Cache-Aside 패턴 적용으로 댓글 조회 응답시간 152ms &rarr; 43ms 및 CTE 실행 횟수 6,642건 &rarr; 458건 감소</li>
+  <li>동시 좋아요 요청 시 유니크 제약 예외 발생, ON DUPLICATE KEY 기반 멱등 처리로 동시 20 VUser 요청에서 예외 0건 달성</li>
+  <li>likes 450만 건에서 집계+개인화 단일 쿼리 풀스캔으로 응답시간 10초&middot;에러율 15% 발생, 쿼리 분리+비정규화로 응답시간 10,460ms &rarr; 167ms&middot;에러율 15.53% &rarr; 0%</li>
+  <li>App CPU 200% 포화로 TPS 350/s 정체, HAProxy cookie insert 기반 수평 확장(App 2대)으로 TPS 350 &rarr; 547/s(+56%)&middot;응답시간 543ms &rarr; 42ms</li>
+  <li>Scale Out 후 MySQL CPU 100% 포화(병목 이동), Read Replica + Sticky Primary(쿠키 3초) 적용으로 응답시간 42ms &rarr; 11ms&middot;p99 316ms &rarr; 74ms&middot;Master CPU 100% &rarr; 25%</li>
+  <li>인스턴스 장애 시 전원 로그아웃되는 세션 구조를 실패 주입으로 실증(동일 쿠키 302 &rarr; /login), Spring Session Redis 전환 + Sticky Session 제거로 장애 중에도 200 OK&middot;요청 분산 정확히 50:50 달성</li>
+  <li>세션 이전 과정에서 세션에 BCrypt 해시가 저장되는 문제를 발견, CredentialsContainer 기반 인증 직후 소거로 제거(Redis 내 해시 검출 1 &rarr; 0건)</li>
+  <li>수동 빌드&middot;배포&middot;모니터링으로 반복 시간 소모, GitHub Actions + Jib + Prometheus&middot;Grafana로 배포~모니터링 자동화</li>
+
+</ul>
+
+<div class="pj-title">PoppingOps &mdash; 백엔드 운영 모니터링&middot;장애 알림 자동화 (2026.04) <a href="https://github.com/Popping-community/popping-openclaw-ops-agent" style="color:#1a73e8; font-size:9pt;">GitHub</a></div>
+<div class="pj-meta">개인 프로젝트 &middot; Bash &middot; Railway &middot; Docker &middot; GitHub Actions</div>
+
+<ul>
+  <li>로컬 PC 의존 모니터링으로 PC 종료 시 감시 불가, Railway 컨테이너 기반 SSH 메트릭 수집으로 최대 10분 이내 자동 알림 전환</li>
+  <li>모든 감지에 AI 사용으로 비용 반복&middot;장애 전파, 정기 감지는 규칙 기반 스크립트로 분리하고 AI는 해석&middot;요약에만 호출하여 정상 상태 AI 비용 0원 유지 및 AI 장애 시에도 감지 동작</li>
+  <li>모니터링 장애 시 정상으로 오인 위험, 유형별 실패 추적 + snapshot freshness 검증으로 &ldquo;서버 장애&rdquo;와 &ldquo;감지 불능&rdquo; 분리 알림</li>
+</ul>
+
+<div class="pj-title">FINNA &mdash; 루틴 관리 서비스 (2024.01 ~ 2024.04) <a href="https://github.com/Finna-GDSC/DoFarming_SERVER" style="color:#1a73e8; font-size:9pt;">GitHub</a></div>
+<div class="pj-meta">팀 프로젝트 (4명) &middot; EC2 실 배포 &middot; 본인 담당: 백엔드 전체</div>
+
+<ul>
+  <li>수동 API 명세 공유로 프론트엔드와 명세 불일치&middot;재작업 발생, Spring REST Docs로 테스트 통과 시에만 문서 생성되는 자동화 파이프라인 구축</li>
+</ul>
+
+<h2 style="page-break-before: always;">Education</h2>
+<div class="edu"><b>성공회대학교</b> &mdash; 소프트웨어공학과, 정보통신공학과(복수전공) 학사 <b>3.77 / 4.5</b> (2020.03 ~ 2025.08)</div>
+
+</body>
+</html>
