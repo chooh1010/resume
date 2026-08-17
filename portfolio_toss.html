@@ -465,10 +465,65 @@ Prometheus &rarr; Grafana (모니터링)</div>
 </ul>
 
 <!-- ============================================ -->
-<!-- 7. Redis 세션 -->
+<!-- 7. 측정 신뢰성 -->
 <!-- ============================================ -->
 
-<h3>7. 인스턴스 장애 시 전원 로그아웃되는 세션 구조를 실패 주입으로 실증, Spring Session Redis 전환 + Sticky Session 제거로 장애 중에도 세션 유지&middot;요청 분산 정확히 50:50 달성</h3>
+<h3>7. 동일 조건 부하테스트가 57%까지 흔들려 효과 검증이 불가능한 문제를 측정 프로토콜로 해결, TTL 캐시 실패(&minus;0.1%)의 원인을 프로파일로 규명해 중복 조회 제거 +4.4%를 순열검정 p=0.05로 검증</h3>
+
+<!-- Problem -->
+<div class="step step-problem">Problem</div>
+<ul>
+  <li>최적화 효과를 재려고 동일 이미지&middot;동일 조건으로 2번 돌린 부하테스트가 <b>390/s vs 613/s &mdash; 57% 차이</b>. 측정 자체의 흔들림이 재려는 효과보다 커서, 이 상태로는 어떤 최적화도 검증 불가</li>
+  <li>원인 후보를 하나씩 배제 &mdash; 캐시 워밍 아님(빠른 런의 히트율이 오히려 낮음 71.8% &rarr; 68.1%), 자원 부족 아님(CPU를 덜 쓰며 36% 더 처리). 남은 유력 원인은 <b>JIT 워밍업</b>: 앱이 2코어 상한에 붙어 있어 컴파일러 스레드가 요청 스레드와 경쟁, 600초 내내 처리량이 우상향</li>
+</ul>
+
+<!-- Analyze -->
+<div class="step step-analyze">Analyze</div>
+<table class="compare">
+  <tr><th style="width:150px;">검토 방식</th><th>검토 결과</th><th style="width:55px;">판단</th></tr>
+  <tr>
+    <td>전 구간 평균으로<br>계속 비교</td>
+    <td>워밍업 램프가 평균을 오염시키는 것이 분산의 실체 &mdash; 같은 데이터를 마지막 구간만 보면 실행 간 차이가 0.8%로 줄어드는 것을 확인</td>
+    <td><span class="tag-reject">기각</span></td>
+  </tr>
+  <tr>
+    <td>워밍업 시간만<br>늘리기</td>
+    <td>600초 1패스로는 안 끝남(1패스 종료 시 JIT 증가율 17.65% &rarr; 2패스 후 0.70% 실측). &ldquo;끝났는지&rdquo;를 판정하는 게이트 없이는 신뢰 불가</td>
+    <td><span class="tag-limit">한계</span></td>
+  </tr>
+  <tr>
+    <td><b>절차를 스크립트로<br>고정 + 이중 게이트</b></td>
+    <td>워밍업 패스는 결과 폐기 + JIT 수렴(2% 이하) 게이트, 본 측정은 마지막 120초 고정 윈도 + STEADY 판정 실패 시 런 폐기. arm당 3회 반복 + ABBA 순서로 시간 편향 상쇄</td>
+    <td><span class="tag-accept">채택</span></td>
+  </tr>
+</table>
+
+<!-- Action -->
+<div class="step step-action">Action</div>
+<ul>
+  <li>arm 1회 실행 전체(이미지 태그 검증 &rarr; 컨테이너 재생성 &rarr; 복제 지연 0 대기 &rarr; 워밍업 반복 &rarr; 본 측정 &rarr; 카운터 스냅샷 &rarr; STEADY 판정)를 스크립트로 자동화하고, 종료 코드로 &ldquo;사용 가능한 런&rdquo;인지 강제</li>
+  <li><b>검출 한계를 명시적으로 정의</b>: 동일 조건 before arm끼리 4.1% 흔들림 &rarr; 그보다 작은 효과는 &ldquo;미확정&rdquo;으로 기록하고 주장하지 않음 (앞선 SVG 최적화 +3.4%는 p=0.10이라 실제로 주장을 접었음)</li>
+  <li><b>프로토콜을 실전 적용</b>: 좋아요 카운트 TTL 3초 캐시가 &minus;0.1%로 실패 &rarr; 히트율 15.9%뿐임을 확인하고, 게시글당 요청 간격(4.9~49초)이 TTL보다 길어 캐시가 구조적으로 안 맞는다는 원인까지 규명</li>
+  <li>replica의 performance_schema digest로 그 재조회 쿼리가 <b>검사 행의 47.3%(88.7M행)로 1위</b>임을 확인 &mdash; 단건 0.39ms로 싼데 매 요청 실행되는 것이 문제. 재귀 CTE가 같은 컬럼을 이미 읽고 있음을 발견해 <b>캐시 미스 경로의 재조회를 생략</b>(같은 트랜잭션의 REPEATABLE READ 스냅샷이라 신선도 손실 0)</li>
+</ul>
+
+<!-- Result -->
+<div class="step step-result">Result</div>
+<div class="result-box">
+  <table>
+    <tr><td class="label" style="width:190px;">동일 조건 재현 편차</td><td class="before">57%</td><td class="arrow">&rarr;</td><td class="after">~4% (검출 한계로 정량화)</td></tr>
+    <tr><td class="label">중복 조회 제거 TPS</td><td class="before">603.0/s</td><td class="arrow">&rarr;</td><td class="after">629.5/s (+4.4%, p=0.05)</td></tr>
+    <tr><td class="label">평균 응답시간</td><td class="before">370 ms</td><td class="arrow">&rarr;</td><td class="after">317 ms (-14.4%)</td></tr>
+    <tr><td class="label">P99 응답시간</td><td class="before">1,395 ms</td><td class="arrow">&rarr;</td><td class="after">1,210 ms (-13.3%)</td></tr>
+  </table>
+</div>
+<div class="note">JMeter 750 VUser, before/after 각 3 arm ABBAAB, 6런 전부 STEADY&middot;에러 0%. after 최솟값이 before 최댓값보다 높은 완전 분리. digest로 미스 시 재조회 1 &rarr; 0건 직접 검증. 폐기한 런과 실패한 실험도 원인과 함께 문서로 기록</div>
+
+<!-- ============================================ -->
+<!-- 8. Redis 세션 -->
+<!-- ============================================ -->
+
+<h3>8. 인스턴스 장애 시 전원 로그아웃되는 세션 구조를 실패 주입으로 실증, Spring Session Redis 전환 + Sticky Session 제거로 장애 중에도 세션 유지&middot;요청 분산 정확히 50:50 달성</h3>
 
 <!-- Problem -->
 <div class="step step-problem">Problem</div>

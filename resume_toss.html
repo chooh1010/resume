@@ -84,6 +84,7 @@
   <li>likes 450만 건에서 집계+개인화 단일 쿼리 풀스캔으로 응답시간 10초&middot;에러율 15% 발생, 쿼리 분리+비정규화로 응답시간 10,460ms &rarr; 167ms&middot;에러율 15.53% &rarr; 0%</li>
   <li>App CPU 200% 포화로 TPS 350/s 정체, HAProxy cookie insert 기반 수평 확장(App 2대)으로 TPS 350 &rarr; 547/s(+56%)&middot;응답시간 543ms &rarr; 42ms</li>
   <li>Scale Out 후 MySQL CPU 100% 포화(병목 이동), Read Replica + Sticky Primary(쿠키 3초) 적용으로 응답시간 42ms &rarr; 11ms&middot;p99 316ms &rarr; 74ms&middot;Master CPU 100% &rarr; 25%</li>
+  <li>동일 조건 부하테스트 57% 편차를 워밍업 통제&middot;정상상태 판정&middot;반복 측정 프로토콜로 해결하고 검출 한계(~4%)를 정의, TTL 캐시 실패(&minus;0.1%)를 프로파일로 규명해 중복 조회 제거 +4.4%를 순열검정 p=0.05로 검증</li>
   <li>인스턴스 장애 시 전원 로그아웃되는 세션 구조를 실패 주입으로 실증(동일 쿠키 302 &rarr; /login), Spring Session Redis 전환 + Sticky Session 제거로 장애 중에도 200 OK&middot;요청 분산 정확히 50:50 달성</li>
   <li>세션 이전 과정에서 세션에 BCrypt 해시가 저장되는 문제를 발견, CredentialsContainer 기반 인증 직후 소거로 제거(Redis 내 해시 검출 1 &rarr; 0건)</li>
   <li>수동 빌드&middot;배포&middot;모니터링으로 반복 시간 소모, GitHub Actions + Jib + Prometheus&middot;Grafana로 배포~모니터링 자동화</li>
